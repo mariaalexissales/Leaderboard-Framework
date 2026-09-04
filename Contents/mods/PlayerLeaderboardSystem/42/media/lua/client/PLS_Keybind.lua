@@ -11,7 +11,7 @@ local HOLD_MS = 250
 
 keyBinding = keyBinding or {}
 table.insert(keyBinding, { value = "[Leaderboard]" })
-table.insert(keyBinding, { value = BIND, key = Keyboard.KEY_TAB })
+table.insert(keyBinding, { value = BIND, key = Keyboard.KEY_RCONTROL })
 
 local pressedMS = nil
 
@@ -25,10 +25,6 @@ end
 -- did this to ignore keybind when focused on chat window
 local function PLS_blocked()
     if ISChat and ISChat.focused then return true end
-
-    local cell = getCell()
-    if cell and cell:getDrag(0) then return true end
-
     return false
 end
 
