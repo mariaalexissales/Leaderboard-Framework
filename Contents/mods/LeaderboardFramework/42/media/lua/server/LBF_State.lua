@@ -48,10 +48,13 @@ function LBF_State.scores(username)
     return entry
 end
 
+-- reads without creating, unlike scores(). every board push looks up the standing of
+-- every online player, and going through scores() would leave an empty table in the save
+-- for everyone who has ever connected without scoring.
 function LBF_State.get(username, board)
     if not username or not board then return 0 end
 
-    local entry = LBF_State.scores(username)
+    local entry = LBF_State.ensure().players[username]
     return entry and entry[board] or 0
 end
 

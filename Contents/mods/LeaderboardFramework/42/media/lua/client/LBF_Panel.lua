@@ -20,7 +20,6 @@ local PAD = 8
 local GAP = 6
 local TAB_HEIGHT = 22
 local FOOTER_HEIGHT = 28
-local REFRESH_TICKS = 30
 
 function LBF.getWindow(playerNum)
     local data = LBF.players[playerNum]
@@ -41,7 +40,6 @@ function LBF_Panel:new(x, y, width, height, player)
     o.title = getText("IGUI_LBF_Title")
     o.tab = nil
     o.rows = {}
-    o.ticks = 0
     o.revision = -1
     -- a peek closes on key release; a tap pins the window until the next tap.
     o.pinned = true
@@ -239,21 +237,16 @@ function LBF_Panel:render()
         LBF_Theme.COL_SCORE.r, LBF_Theme.COL_SCORE.g, LBF_Theme.COL_SCORE.b, 1, font)
 end
 
+-- rows only ever change when the server pushes a board, and the cache bumps a revision
+-- on every one of those, so there is nothing for a tick floor to catch. the footer reads
+-- the cache directly in render and is live regardless.
 function LBF_Panel:update()
     ISCollapsableWindow.update(self)
 
-    -- the cache bumps a revision on anything from the server; the tick floor only
-    -- backstops whatever moves without it.
-    self.ticks = self.ticks + 1
+    if self.revision == LBF_ClientState.revision then return end
 
-    if self.revision ~= LBF_ClientState.revision then
-        self.revision = LBF_ClientState.revision
-        self.ticks = 0
-        self:refresh()
-    elseif self.ticks >= REFRESH_TICKS then
-        self.ticks = 0
-        self:refresh()
-    end
+    self.revision = LBF_ClientState.revision
+    self:refresh()
 end
 
 function LBF_Panel:onResize()
