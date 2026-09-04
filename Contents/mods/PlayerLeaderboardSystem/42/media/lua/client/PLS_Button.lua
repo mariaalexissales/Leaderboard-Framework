@@ -3,11 +3,11 @@
 ----------
 
 require "ISUI/ISButton"
-require "LBF_Theme"
+require "PLS_Theme"
 
-LBF_Button = ISButton:derive("LBF_Button")
+PLS_Button = ISButton:derive("PLS_Button")
 
-function LBF_Button:new(x, y, width, height, title, target, onclick)
+function PLS_Button:new(x, y, width, height, title, target, onclick)
     local o = ISButton:new(x, y, width, height, title, target, onclick)
     setmetatable(o, self)
     self.__index = self
@@ -21,20 +21,20 @@ function LBF_Button:new(x, y, width, height, title, target, onclick)
     return o
 end
 
-function LBF_Button:sizeToTitle(padding)
+function PLS_Button:sizeToTitle(padding)
     self:setWidth(getTextManager():MeasureStringX(self.font, self.title) + (padding or 20))
     return self
 end
 
-function LBF_Button:state()
-    if not self.enable then return LBF_Theme.STATES.disabled end
-    if self.pressed then return LBF_Theme.STATES.pressed end
-    if self.selected then return LBF_Theme.STATES.selected end
-    if self.mouseOver and self:isMouseOver() then return LBF_Theme.STATES.hover end
-    return LBF_Theme.STATES.normal
+function PLS_Button:state()
+    if not self.enable then return PLS_Theme.STATES.disabled end
+    if self.pressed then return PLS_Theme.STATES.pressed end
+    if self.selected then return PLS_Theme.STATES.selected end
+    if self.mouseOver and self:isMouseOver() then return PLS_Theme.STATES.hover end
+    return PLS_Theme.STATES.normal
 end
 
-function LBF_Button:prerender()
+function PLS_Button:prerender()
     ISButton.prerender(self)
 
     local state = self:state()
@@ -46,7 +46,7 @@ function LBF_Button:prerender()
         self:drawRect(0, 0, self.width, self.height, state.fill[4], state.fill[1], state.fill[2], state.fill[3])
     end
 
-    local textures = LBF_Theme.textures()
+    local textures = PLS_Theme.textures()
     if NeatTool and NeatTool.ThreePatch then
         NeatTool.ThreePatch.drawHorizontal(self, 0, 0, self.width, self.height,
             textures.left, textures.middle, textures.right,

@@ -2,28 +2,28 @@
 --ESTRAL--
 ----------
 
-require "LBF_Core"
-require "LBF_Boards"
-require "LBF_State"
+require "PLS_Core"
+require "PLS_Boards"
+require "PLS_State"
 
-if not LBF.isAuthority() then return end
+if not PLS.isAuthority() then return end
 
-LBF = LBF or {}
-LBF_Kills = LBF_Kills or {}
+PLS = PLS or {}
+PLS_Kills = PLS_Kills or {}
 
 -- a client reporting its own zombie kills is trusted only this far in one go. anything
 -- past it is a broken client or somebody editing their counter.
 local MAX_PER_FLUSH = 40
 
-function LBF_Kills.creditZombie(username, amount)
+function PLS_Kills.creditZombie(username, amount)
     if not username then return end
-    if not LBF_Boards.enabled("zombie") then return end
+    if not PLS_Boards.enabled("zombie") then return end
 
-    LBF_State.add(username, "zombie", amount or 1)
+    PLS_State.add(username, "zombie", amount or 1)
 end
 
-local function LBF_onZombieDead(zombie)
-    if LBF.Config.clientKillReporting then return end
+local function PLS_onZombieDead(zombie)
+    if PLS.Config.clientKillReporting then return end
     if not zombie then return end
 
     -- OnZombieDead passes the zombie and nothing else, so the killer comes off the zombie.
@@ -31,32 +31,32 @@ local function LBF_onZombieDead(zombie)
     local attacker = zombie:getAttackedBy()
     if not attacker or not instanceof(attacker, "IsoPlayer") then return end
 
-    LBF_Kills.creditZombie(LBF.nameOf(attacker), 1)
+    PLS_Kills.creditZombie(PLS.nameOf(attacker), 1)
 end
 
-LBF.guard("zombie kill credit", Events.OnZombieDead, LBF_onZombieDead)
+PLS.guard("zombie kill credit", Events.OnZombieDead, PLS_onZombieDead)
 
--- the fallback path, off unless LBF.Config.clientKillReporting is set. some dedicated
+-- the fallback path, off unless PLS.Config.clientKillReporting is set. some dedicated
 -- servers hand back a nil attacker on every kill, which leaves the board permanently
 -- empty; a client diffing its own vanilla kill counter at least fills it. the count is
 -- all the server takes, and it is clamped.
-function LBF_Kills.onReported(player, args)
-    if not LBF.Config.clientKillReporting then return end
+function PLS_Kills.onReported(player, args)
+    if not PLS.Config.clientKillReporting then return end
     if not player or not args then return end
 
     local count = tonumber(args.n) or 0
     if count < 1 then return end
 
-    local username = LBF.nameOf(player)
+    local username = PLS.nameOf(player)
     if not username then return end
 
     if count > MAX_PER_FLUSH then
-        LBF.warn(username .. " reported " .. count
+        PLS.warn(username .. " reported " .. count
             .. " zombie kills in one flush, clamped to " .. MAX_PER_FLUSH)
         count = MAX_PER_FLUSH
     end
 
-    LBF_Kills.creditZombie(username, count)
+    PLS_Kills.creditZombie(username, count)
 end
 
 -- ----------------------------------------------------------------------------
@@ -82,7 +82,7 @@ local DEATH_COOLDOWN_MS = 3000
 local hits = {}
 local lastDeath = {}
 
-local function LBF_prune(now)
+local function PLS_prune(now)
     for victim, byAttacker in pairs(hits) do
         for attacker, at in pairs(byAttacker) do
             if now - at > HIT_WINDOW_MS then byAttacker[attacker] = nil end
@@ -94,36 +94,36 @@ end
 -- player is the attacker, handed over by the engine. args.victim is the only part a
 -- client chose, and the worst it can do is put a name in a ledger that is then only
 -- spent if that name actually dies.
-function LBF_Kills.onHit(player, args)
-    if not LBF_Boards.enabled("pvp") then return end
+function PLS_Kills.onHit(player, args)
+    if not PLS_Boards.enabled("pvp") then return end
     if not player or not args then return end
 
-    local attacker = LBF.nameOf(player)
+    local attacker = PLS.nameOf(player)
     if not attacker then return end
 
     local victim = args.victim
     if type(victim) ~= "string" or victim == "" or victim == attacker then return end
 
     local now = getTimestampMs()
-    LBF_prune(now)
+    PLS_prune(now)
 
     hits[victim] = hits[victim] or {}
     hits[victim][attacker] = now
 end
 
 -- player is the victim, handed over by the engine, never read out of args.
-function LBF_Kills.onDeath(player, args)
-    if not LBF_Boards.enabled("pvp") then return end
+function PLS_Kills.onDeath(player, args)
+    if not PLS_Boards.enabled("pvp") then return end
     if not player then return end
 
-    local victim = LBF.nameOf(player)
+    local victim = PLS.nameOf(player)
     if not victim then return end
 
     local now = getTimestampMs()
     if now - (lastDeath[victim] or 0) < DEATH_COOLDOWN_MS then return end
     lastDeath[victim] = now
 
-    LBF_prune(now)
+    PLS_prune(now)
 
     local ledger = hits[victim]
     -- nobody hit them inside the window, so this was a zombie, a fall, a fire or hunger.
@@ -151,5 +151,5 @@ function LBF_Kills.onDeath(player, args)
 
     if not killer or killer == victim then return end
 
-    LBF_State.add(killer, "pvp", 1)
+    PLS_State.add(killer, "pvp", 1)
 end

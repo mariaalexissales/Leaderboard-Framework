@@ -2,12 +2,12 @@
 --ESTRAL--
 ----------
 
-LBF = LBF or {}
+PLS = PLS or {}
 
-LBF.MODULE = "LBF"
-LBF.SCHEMA_V = 1
+PLS.MODULE = "PLS"
+PLS.SCHEMA_V = 1
 
-LBF.Config = LBF.Config or {
+PLS.Config = PLS.Config or {
     -- flip this if a dedicated server logs a nil attacker on the zombie kill path. the
     -- client reports its own vanilla kill counter instead, which is clamped but cheaper
     -- to cheat.
@@ -15,28 +15,28 @@ LBF.Config = LBF.Config or {
 }
 
 -- server/ lua loads on multiplayer clients too, and isServer() is false in singleplayer.
-function LBF.isAuthority()
+function PLS.isAuthority()
     return not (isClient() and not isServer())
 end
 
-function LBF.hasRemoteServer()
+function PLS.hasRemoteServer()
     return isClient() and not isServer()
 end
 
-function LBF.isAdmin(player)
-    if not LBF.hasRemoteServer() then return true end
+function PLS.isAdmin(player)
+    if not PLS.hasRemoteServer() then return true end
     if not player then return false end
 
     local level = player:getAccessLevel()
     return level == "Admin" or level == "GM" or level == "Moderator"
 end
 
-function LBF.log(message)
-    print("[LBF] " .. tostring(message))
+function PLS.log(message)
+    print("[PLS] " .. tostring(message))
 end
 
-function LBF.warn(message)
-    print("[LBF] WARN: " .. tostring(message))
+function PLS.warn(message)
+    print("[PLS] WARN: " .. tostring(message))
 end
 
 -- a handler that throws is simply called again on the next event, so one that fires on a
@@ -51,7 +51,7 @@ local GUARD_LIMIT = 3
 -- four parameters rather than varargs, because no vanilla lua forwards ... into pcall and
 -- kahlua is not a lua this mod gets to assume things about. that covers every event we
 -- guard; anything wider would silently drop its later arguments.
-function LBF.guard(name, event, fn)
+function PLS.guard(name, event, fn)
     local failures = 0
     local wrapped
 
@@ -67,10 +67,10 @@ function LBF.guard(name, event, fn)
         end
 
         failures = failures + 1
-        LBF.warn(name .. " failed: " .. tostring(err))
+        PLS.warn(name .. " failed: " .. tostring(err))
 
         if failures >= GUARD_LIMIT then
-            LBF.warn(name .. " has failed " .. GUARD_LIMIT
+            PLS.warn(name .. " has failed " .. GUARD_LIMIT
                 .. " times in a row and is stopped for the rest of this session")
             event.Remove(wrapped)
         end
@@ -80,8 +80,8 @@ function LBF.guard(name, event, fn)
     return wrapped
 end
 
--- getText on a missing key returns the key, which would print IGUI_LBF_BoardPvP in the UI.
-function LBF.text(key, fallback)
+-- getText on a missing key returns the key, which would print IGUI_PLS_BoardPvP in the UI.
+function PLS.text(key, fallback)
     local value = getTextOrNull(key)
     if value and value ~= "" then return value end
     return fallback or key
@@ -89,8 +89,8 @@ end
 
 -- SandboxVars is nil until the world loads, and the client's copy arrives a little after
 -- the lua does, so every read goes through here rather than indexing it directly.
-function LBF.sandbox(name, fallback)
-    local vars = SandboxVars and SandboxVars.LeaderboardFramework
+function PLS.sandbox(name, fallback)
+    local vars = SandboxVars and SandboxVars.PlayerLeaderboardSystem
     if not vars then return fallback end
 
     local value = vars[name]
@@ -101,7 +101,7 @@ end
 -- every score is keyed by this. getUsername is the account name on a server and is what
 -- has to survive a death, but singleplayer leaves it empty, so a solo game falls back to
 -- the character's own name and scores per character instead.
-function LBF.nameOf(player)
+function PLS.nameOf(player)
     if not player then return nil end
 
     local username = player:getUsername()

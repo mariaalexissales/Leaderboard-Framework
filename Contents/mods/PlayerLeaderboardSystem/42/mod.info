@@ -1,5 +1,5 @@
-name=Leaderboard Framework
-id=LeaderboardFramework
+name=Player Leaderboard System
+id=PlayerLeaderboardSystem
 author=Estral
 description=Server-wide kill leaderboards with a live first-place broadcast - by Estral
 poster=poster.png

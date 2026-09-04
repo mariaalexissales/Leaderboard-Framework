@@ -1,7 +1,7 @@
 version=1
 id=
-title=Leaderboard Framework
-description=[h1]Leaderboard Framework[/h1]
+title=Player Leaderboard System
+description=[h1]Player Leaderboard System[/h1]
 description=[h2]Made for MP Servers in mind :D[/h2]
 description=[b]A server-wide kill leaderboard, and everyone hears about it when the crown changes hands.[/b]
 description=

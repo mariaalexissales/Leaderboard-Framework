@@ -2,11 +2,11 @@
 --ESTRAL--
 ----------
 
-require "LBF_Core"
-require "LBF_Boards"
+require "PLS_Core"
+require "PLS_Boards"
 
-LBF = LBF or {}
-LBF_Chat = LBF_Chat or {}
+PLS = PLS or {}
+PLS_Chat = PLS_Chat or {}
 
 -- gold, so an announcement reads as one against the ordinary chat traffic around it.
 local COLOUR = "<RGB:0.98,0.82,0.45>"
@@ -15,7 +15,7 @@ local COLOUR = "<RGB:0.98,0.82,0.45>"
 -- so the line goes straight into the tab's own backing table the way every other mod that
 -- prints to chat does it. wrapped whole: chat is somebody else's window and its internals
 -- move between builds, and a broken announcement must not take the game down with it.
-function LBF_Chat.line(text)
+function PLS_Chat.line(text)
     local ok = pcall(function()
         if not ISChat or not ISChat.instance then error() end
 
@@ -61,22 +61,22 @@ function LBF_Chat.line(text)
     end
 end
 
-function LBF_Chat.announce(args)
+function PLS_Chat.announce(args)
     if not args or not args.name or not args.board then return end
 
-    local def = LBF_Boards.get(args.board)
+    local def = PLS_Boards.get(args.board)
     local title = def and getText(def.title) or args.board
     local unit = def and getText(def.unit) or ""
 
-    LBF_Chat.line(COLOUR .. getText("IGUI_LBF_Announce",
+    PLS_Chat.line(COLOUR .. getText("IGUI_PLS_Announce",
         args.name, title, tostring(args.score or 0), unit))
 
     local player = getPlayer()
-    if not player or LBF.nameOf(player) ~= args.name then return end
+    if not player or PLS.nameOf(player) ~= args.name then return end
 
     if HaloTextHelper and HaloTextHelper.addGoodText then
         pcall(function()
-            HaloTextHelper.addGoodText(player, getText("IGUI_LBF_AnnounceHalo", title))
+            HaloTextHelper.addGoodText(player, getText("IGUI_PLS_AnnounceHalo", title))
         end)
     end
 end

@@ -1,0 +1,41 @@
+/*----------*/
+/*--ESTRAL--*/
+/*----------*/
+
+VERSION = 1,
+
+option PlayerLeaderboardSystem.TrackZombieKills
+{
+    type = boolean, default = true,
+    page = PlayerLeaderboardSystem, translation = PLS_TrackZombieKills,
+}
+
+option PlayerLeaderboardSystem.TrackPlayerKills
+{
+    type = boolean, default = false,
+    page = PlayerLeaderboardSystem, translation = PLS_TrackPlayerKills,
+}
+
+option PlayerLeaderboardSystem.AnnounceFirstPlace
+{
+    type = boolean, default = true,
+    page = PlayerLeaderboardSystem, translation = PLS_AnnounceFirstPlace,
+}
+
+option PlayerLeaderboardSystem.AnnounceCooldownMinutes
+{
+    type = integer, min = 0, max = 120, default = 5,
+    page = PlayerLeaderboardSystem, translation = PLS_AnnounceCooldownMinutes,
+}
+
+option PlayerLeaderboardSystem.BoardSize
+{
+    type = integer, min = 3, max = 50, default = 10,
+    page = PlayerLeaderboardSystem, translation = PLS_BoardSize,
+}
+
+option PlayerLeaderboardSystem.MinScoreToRank
+{
+    type = integer, min = 1, max = 1000, default = 1,
+    page = PlayerLeaderboardSystem, translation = PLS_MinScoreToRank,
+}
