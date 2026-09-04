@@ -39,6 +39,47 @@ function LBF.warn(message)
     print("[LBF] WARN: " .. tostring(message))
 end
 
+-- a handler that throws is simply called again on the next event, so one that fires on a
+-- timer or on every swing can write a stack trace per call into console.txt for the rest
+-- of the session. a server left running overnight is the case that hurts.
+--
+-- every repeating handler is registered through here instead. the first few failures are
+-- logged with the actual reason, and then the handler takes itself back off the event.
+-- a broken handler costs four lines and stops; the rest of the mod carries on.
+local GUARD_LIMIT = 3
+
+-- four parameters rather than varargs, because no vanilla lua forwards ... into pcall and
+-- kahlua is not a lua this mod gets to assume things about. that covers every event we
+-- guard; anything wider would silently drop its later arguments.
+function LBF.guard(name, event, fn)
+    local failures = 0
+    local wrapped
+
+    wrapped = function(a, b, c, d)
+        local ok, err = pcall(fn, a, b, c, d)
+
+        if ok then
+            -- consecutive, not cumulative. an occasional hiccup should not retire a
+            -- handler that works, and the failures worth stopping for -- a nil global, a
+            -- bad field -- fail on every single call and trip this immediately.
+            failures = 0
+            return
+        end
+
+        failures = failures + 1
+        LBF.warn(name .. " failed: " .. tostring(err))
+
+        if failures >= GUARD_LIMIT then
+            LBF.warn(name .. " has failed " .. GUARD_LIMIT
+                .. " times in a row and is stopped for the rest of this session")
+            event.Remove(wrapped)
+        end
+    end
+
+    event.Add(wrapped)
+    return wrapped
+end
+
 -- getText on a missing key returns the key, which would print IGUI_LBF_BoardPvP in the UI.
 function LBF.text(key, fallback)
     local value = getTextOrNull(key)

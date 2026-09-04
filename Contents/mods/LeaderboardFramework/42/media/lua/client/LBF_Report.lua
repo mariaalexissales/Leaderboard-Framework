@@ -86,6 +86,9 @@ local function LBF_pollZombieKills()
     LBF_Net.toServer("kills", { n = delta })
 end
 
-Events.OnWeaponHitCharacter.Add(LBF_onWeaponHitCharacter)
+-- the two that repeat go behind the guard: a swing connects several times a second in a
+-- horde, and the poll is on a timer. a death is a one-off and is left alone, so a fault
+-- there still surfaces the ordinary way.
+LBF.guard("pvp hit report", Events.OnWeaponHitCharacter, LBF_onWeaponHitCharacter)
+LBF.guard("zombie kill poll", Events.EveryOneMinute, LBF_pollZombieKills)
 Events.OnPlayerDeath.Add(LBF_onPlayerDeath)
-Events.EveryOneMinute.Add(LBF_pollZombieKills)

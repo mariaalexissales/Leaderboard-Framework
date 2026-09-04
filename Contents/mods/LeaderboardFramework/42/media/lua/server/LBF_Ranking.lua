@@ -180,6 +180,5 @@ local function LBF_pump()
 end
 
 -- EveryOneMinute, not OnTick. this is about one call a second at default day length
--- instead of sixty, and an error in here is one of the few things in a mod that can fill
--- a server's console.txt on its own. GameTime fires it, so it runs on a dedicated server.
-Events.EveryOneMinute.Add(LBF_pump)
+-- instead of sixty. GameTime fires it, so it runs on a dedicated server.
+LBF.guard("board pump", Events.EveryOneMinute, LBF_pump)

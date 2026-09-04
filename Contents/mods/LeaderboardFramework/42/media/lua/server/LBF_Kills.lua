@@ -34,7 +34,7 @@ local function LBF_onZombieDead(zombie)
     LBF_Kills.creditZombie(LBF.nameOf(attacker), 1)
 end
 
-Events.OnZombieDead.Add(LBF_onZombieDead)
+LBF.guard("zombie kill credit", Events.OnZombieDead, LBF_onZombieDead)
 
 -- the fallback path, off unless LBF.Config.clientKillReporting is set. some dedicated
 -- servers hand back a nil attacker on every kill, which leaves the board permanently
