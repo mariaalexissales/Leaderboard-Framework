@@ -13,7 +13,9 @@ LBF = LBF or {}
 LBF_Ranking = LBF_Ranking or {}
 
 -- a horde is a kill every second or so per player. without this the board would be
--- rebuilt and pushed to everyone on every one of them.
+-- rebuilt and pushed to everyone on every one of them. it is kept even though the pump
+-- now runs on EveryOneMinute rather than every tick, because that event runs on game time
+-- and sprints while a player sleeps; the real clock is what holds the cadence steady.
 local RECOMPUTE_MS = 3000
 
 local lastRecompute = 0
@@ -177,4 +179,7 @@ local function LBF_pump()
     end
 end
 
-Events.OnTick.Add(LBF_pump)
+-- EveryOneMinute, not OnTick. this is about one call a second at default day length
+-- instead of sixty, and an error in here is one of the few things in a mod that can fill
+-- a server's console.txt on its own. GameTime fires it, so it runs on a dedicated server.
+Events.EveryOneMinute.Add(LBF_pump)
