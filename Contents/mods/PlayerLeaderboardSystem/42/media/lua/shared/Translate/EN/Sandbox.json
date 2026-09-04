@@ -17,5 +17,8 @@
   "Sandbox_PLS_BoardSize_tooltip": "How many ranks the server sends to each client. Players outside this still see their own standing. (3-50)",
 
   "Sandbox_PLS_MinScoreToRank": "Minimum Score To Rank",
-  "Sandbox_PLS_MinScoreToRank_tooltip": "A player needs at least this much to appear on a board, so the list is not padded with everyone sitting on nothing. (1-1000)"
+  "Sandbox_PLS_MinScoreToRank_tooltip": "A player needs at least this much to appear on a board, so the list is not padded with everyone sitting on nothing. (1-1000)",
+
+  "Sandbox_PLS_CountAdminKills": "Count Admin Kills",
+  "Sandbox_PLS_CountAdminKills_tooltip": "Off by default, so anyone on an admin, moderator, GM, overseer or observer account stays off the boards. Turn it on if your staff play normally, or if you host the server yourself and want your own kills counted."
 }

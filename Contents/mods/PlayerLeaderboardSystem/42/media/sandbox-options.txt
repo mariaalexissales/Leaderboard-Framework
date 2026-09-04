@@ -39,3 +39,9 @@ option PlayerLeaderboardSystem.MinScoreToRank
     type = integer, min = 1, max = 1000, default = 1,
     page = PlayerLeaderboardSystem, translation = PLS_MinScoreToRank,
 }
+
+option PlayerLeaderboardSystem.CountAdminKills
+{
+    type = boolean, default = false,
+    page = PlayerLeaderboardSystem, translation = PLS_CountAdminKills,
+}

@@ -15,6 +15,20 @@ PLS_Kills = PLS_Kills or {}
 -- past it is a broken client or somebody editing their counter.
 local MAX_PER_FLUSH = 40
 
+-- an elevated account can spawn whatever it likes, so its kills are not a score. the
+-- sandbox option is there for staff who play normally, and for a host, who is always admin.
+function PLS_Kills.shouldCount(player)
+    if not player then return false end
+
+    -- getDebug reads this process's own flag, so it catches singleplayer and a host but
+    -- never a remote client. on a dedicated server the role check below is what works.
+    if getCore():getDebug() then return false end
+
+    if PLS.sandbox("CountAdminKills", false) == true then return true end
+
+    return not PLS.isElevated(player)
+end
+
 function PLS_Kills.creditZombie(username, amount)
     if not username then return end
     if not PLS_Boards.enabled("zombie") then return end
@@ -30,6 +44,7 @@ local function PLS_onZombieDead(zombie)
     -- nil for fire, falls and cars, and anything that is not a player has no username.
     local attacker = zombie:getAttackedBy()
     if not attacker or not instanceof(attacker, "IsoPlayer") then return end
+    if not PLS_Kills.shouldCount(attacker) then return end
 
     PLS_Kills.creditZombie(PLS.nameOf(attacker), 1)
 end
@@ -43,6 +58,7 @@ PLS.guard("zombie kill credit", Events.OnZombieDead, PLS_onZombieDead)
 function PLS_Kills.onReported(player, args)
     if not PLS.Config.clientKillReporting then return end
     if not player or not args then return end
+    if not PLS_Kills.shouldCount(player) then return end
 
     local count = tonumber(args.n) or 0
     if count < 1 then return end
@@ -97,6 +113,10 @@ end
 function PLS_Kills.onHit(player, args)
     if not PLS_Boards.enabled("pvp") then return end
     if not player or not args then return end
+    -- filtered here rather than at the death, because the credit is spent by name and the
+    -- player object is only in hand on this side of it. an elevated player never enters the
+    -- ledger, so no kill can be credited to them; being killed by one still counts.
+    if not PLS_Kills.shouldCount(player) then return end
 
     local attacker = PLS.nameOf(player)
     if not attacker then return end
