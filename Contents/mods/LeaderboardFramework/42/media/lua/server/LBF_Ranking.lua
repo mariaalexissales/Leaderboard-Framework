@@ -159,8 +159,9 @@ function LBF_Ranking.sendAll(player)
 end
 
 local function LBF_pump()
-    -- one table lookup on the overwhelming majority of ticks.
-    if next(LBF_State.dirty) == nil then return end
+    -- table.isempty, not next(): kahlua's BaseLib does not register next at all, so
+    -- calling it is a call on a nil value. vanilla uses table.isempty for this.
+    if table.isempty(LBF_State.dirty) then return end
 
     local now = getTimestampMs()
     if now - lastRecompute < RECOMPUTE_MS then return end

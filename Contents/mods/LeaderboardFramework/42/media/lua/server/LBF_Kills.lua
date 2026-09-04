@@ -87,7 +87,7 @@ local function LBF_prune(now)
         for attacker, at in pairs(byAttacker) do
             if now - at > HIT_WINDOW_MS then byAttacker[attacker] = nil end
         end
-        if next(byAttacker) == nil then hits[victim] = nil end
+        if table.isempty(byAttacker) then hits[victim] = nil end
     end
 end
 
