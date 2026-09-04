@@ -23,12 +23,32 @@ function PLS.hasRemoteServer()
     return isClient() and not isServer()
 end
 
+-- the engine ships both spellings: Role.class has Admin/GM/Moderator, Roles.class has
+-- admin/gm/moderator, and vanilla lua compares the lowercase one. normalising here stops a
+-- case-sensitive test being a coin flip.
+function PLS.accessLevel(player)
+    if not player then return "none" end
+
+    local level = player:getAccessLevel()
+    if not level or level == "" then return "none" end
+
+    return string.lower(level)
+end
+
 function PLS.isAdmin(player)
     if not PLS.hasRemoteServer() then return true end
     if not player then return false end
 
-    local level = player:getAccessLevel()
-    return level == "Admin" or level == "GM" or level == "Moderator"
+    local level = PLS.accessLevel(player)
+    return level == "admin" or level == "gm" or level == "moderator"
+end
+
+-- isAdmin answers "may this player press the admin button" and is deliberately true with no
+-- remote server. this answers "should this player's kills count", which is a different
+-- question and must not be true just because nobody is hosting.
+function PLS.isElevated(player)
+    if not player then return false end
+    return PLS.accessLevel(player) ~= "none"
 end
 
 function PLS.log(message)
