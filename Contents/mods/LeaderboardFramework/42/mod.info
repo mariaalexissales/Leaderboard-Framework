@@ -1,0 +1,7 @@
+name=Leaderboard Framework
+id=LeaderboardFramework
+author=Estral
+description=Server-wide kill leaderboards with a live first-place broadcast - by Estral
+poster=poster.png
+require=NeatUI_Framework
+versionMin=42.20

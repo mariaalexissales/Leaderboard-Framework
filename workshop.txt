@@ -1,0 +1,16 @@
+version=1
+id=
+title=Leaderboard Framework
+description=[h1]Leaderboard Framework[/h1]
+description=[h2]Made for MP Servers in mind :D[/h2]
+description=[b]A server-wide kill leaderboard, and everyone hears about it when the crown changes hands.[/b]
+description=
+description=Press [b]Tab[/b] and there it is. Hold it to peek, tap it to pin it open.
+description=
+description=[hr][/hr]
+description=[h2]What It Tracks[/h2]
+description=[b]Zombie kills[/b] and [b]player kills[/b], each its own board, each switched on or off in sandbox options. Scores are per account, so dying doesn't wipe your standing.
+description=
+description=[b][u]Requires [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3508537032]NeatUI Framework[/url][/u][/b] by Rocco & Afyrmo - subscribe to that as well or the panel won't load.
+tags=Build 42;Framework;Misc;Multiplayer;PvP;QoL;WIP
+visibility=public

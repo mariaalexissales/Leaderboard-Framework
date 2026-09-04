@@ -1,0 +1,7 @@
+# lua and mod metadata ship with LF. project zomboid checksums mod files on
+# multiplayer join, and a CRLF working copy can fail that check on a linux server.
+*.lua text eol=lf
+*.json text eol=lf
+mod.info text eol=lf
+workshop.txt text eol=lf
+*.png binary
