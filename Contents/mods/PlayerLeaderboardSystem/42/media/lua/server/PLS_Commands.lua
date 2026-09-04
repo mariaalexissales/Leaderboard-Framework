@@ -16,8 +16,18 @@ PLS_Commands = PLS_Commands or {}
 
 PLS_Commands.handlers = {}
 
+-- hello rebuilds every board, and it is on a button now, so it is worth a floor.
+local HELLO_COOLDOWN_MS = 1000
+local lastHello = {}
+
 function PLS_Commands.handlers.hello(player)
-    if not player or not PLS.nameOf(player) then return end
+    local name = player and PLS.nameOf(player)
+    if not name then return end
+
+    local now = getTimestampMs()
+    if now - (lastHello[name] or 0) < HELLO_COOLDOWN_MS then return end
+    lastHello[name] = now
+
     PLS_Ranking.sendAll(player)
 end
 

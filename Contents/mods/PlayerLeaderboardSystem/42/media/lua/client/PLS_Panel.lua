@@ -110,7 +110,14 @@ function PLS_Panel:createChildren()
     self.listHeight = listHeight
     self:addChild(self.list)
 
-    self.reset = PLS_Button:new(self.width - PAD - 100, footerY + 1, 100, FOOTER_HEIGHT - 4,
+    -- refreshBtn, not refresh: PLS_Panel:refresh is a method, and a field of that name on
+    -- the instance would shadow it and turn self:refresh() into a call on a button.
+    self.refreshBtn = PLS_Button:new(self.width - PAD - 90, footerY + 1, 90, FOOTER_HEIGHT - 4,
+        getText("IGUI_PLS_Refresh"), self, PLS_Panel.onRefresh)
+    self:attach(self.refreshBtn, { anchorLeft = false, anchorRight = true })
+
+    -- inside the always-visible one, so refresh keeps a fixed spot whoever is looking.
+    self.reset = PLS_Button:new(self.refreshBtn:getX() - 4 - 100, footerY + 1, 100, FOOTER_HEIGHT - 4,
         getText("IGUI_PLS_Reset"), self, PLS_Panel.onReset)
     self:attach(self.reset, { anchorLeft = false, anchorRight = true })
 
@@ -120,6 +127,11 @@ end
 function PLS_Panel:onTab(button)
     self.tab = button.board
     self:refresh()
+end
+
+function PLS_Panel:onRefresh()
+    PLS_ClientState.rearm()
+    PLS_ClientState.requestBoards()
 end
 
 function PLS_Panel:onReset()
@@ -269,6 +281,7 @@ function PLS_Panel:onResize()
     self.list:setDataSource(self.rows, true)
 
     if self.reset then self.reset:setY(footerY + 1) end
+    if self.refreshBtn then self.refreshBtn:setY(footerY + 1) end
 end
 
 function PLS_Panel:close()
@@ -295,6 +308,13 @@ function PLS.openPanel(player, pinned)
 
     local playerNum = player:getPlayerNum()
     if playerNum ~= 0 then return end
+
+    -- a join that missed the handshake would otherwise sit on "waiting" until somebody
+    -- else scores, so looking at the panel is itself a reason to ask again.
+    if not PLS_ClientState.ready then
+        PLS_ClientState.rearm()
+        PLS_ClientState.requestBoards()
+    end
 
     -- NeatUI is declared in mod.info, but a client that has somehow loaded us without it
     -- would otherwise index a nil and take the whole ui down with it.

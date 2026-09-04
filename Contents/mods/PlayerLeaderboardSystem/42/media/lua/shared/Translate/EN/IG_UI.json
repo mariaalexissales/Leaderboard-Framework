@@ -17,6 +17,7 @@
   "IGUI_PLS_Announce": "%1 has taken first place in %2, with %3 %4!",
   "IGUI_PLS_AnnounceHalo": "First place in %1!",
 
+  "IGUI_PLS_Refresh": "Refresh",
   "IGUI_PLS_Reset": "Reset Board",
   "IGUI_PLS_ResetConfirm": "Wipe every score on this board? This cannot be undone.",
   "IGUI_PLS_ResetDone": "%1 has been reset."

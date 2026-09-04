@@ -28,7 +28,15 @@ function PLS_Net.toServer(command, args)
     args = args or {}
 
     if PLS_Net.hasRemoteServer() then
-        sendClientCommand(getPlayer(), PLS.MODULE, command, args)
+        -- nil this early on a multiplayer client, and handing nil to sendClientCommand
+        -- loses the packet without a word. say so, and let the caller retry.
+        local player = getPlayer()
+        if not player then
+            PLS.warn("no local player yet, dropped " .. tostring(command))
+            return
+        end
+
+        sendClientCommand(player, PLS.MODULE, command, args)
         return
     end
 
