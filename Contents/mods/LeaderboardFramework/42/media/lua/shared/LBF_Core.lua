@@ -56,3 +56,23 @@ function LBF.sandbox(name, fallback)
     if value == nil then return fallback end
     return value
 end
+
+-- every score is keyed by this. getUsername is the account name on a server and is what
+-- has to survive a death, but singleplayer leaves it empty, so a solo game falls back to
+-- the character's own name and scores per character instead.
+function LBF.nameOf(player)
+    if not player then return nil end
+
+    local username = player:getUsername()
+    if username and username ~= "" then return username end
+
+    local descriptor = player:getDescriptor()
+    if descriptor then
+        local forename = descriptor:getForename() or ""
+        local surname = descriptor:getSurname() or ""
+        local full = (forename .. " " .. surname):gsub("^%s+", ""):gsub("%s+$", "")
+        if full ~= "" then return full end
+    end
+
+    return nil
+end
