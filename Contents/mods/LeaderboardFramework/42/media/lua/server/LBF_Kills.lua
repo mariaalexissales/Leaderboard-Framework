@@ -58,3 +58,98 @@ function LBF_Kills.onReported(player, args)
 
     LBF_Kills.creditZombie(username, count)
 end
+
+-- ----------------------------------------------------------------------------
+-- player kills
+-- ----------------------------------------------------------------------------
+--
+-- combat is resolved on the attacking client, so the server never sees the swing that
+-- landed. it is told about the kill twice instead, from both ends, and only credits one
+-- when the two agree:
+--
+--   the attacker's client reports "i hit this player" and the server writes that into a
+--   short-lived ledger. the victim's client reports "i died, and this is who did it".
+--
+-- the credit is taken from the ledger, not from the victim's claim. so a victim cannot
+-- hand first place to a friend who never touched them, and an attacker cannot credit
+-- themselves without a real hit landing on someone who really died.
+
+local HIT_WINDOW_MS = 30000
+local DEATH_COOLDOWN_MS = 3000
+
+-- runtime only, both of them. a thirty second ledger and a rate limit have no business
+-- surviving a restart or sitting in the world save.
+local hits = {}
+local lastDeath = {}
+
+local function LBF_prune(now)
+    for victim, byAttacker in pairs(hits) do
+        for attacker, at in pairs(byAttacker) do
+            if now - at > HIT_WINDOW_MS then byAttacker[attacker] = nil end
+        end
+        if next(byAttacker) == nil then hits[victim] = nil end
+    end
+end
+
+-- player is the attacker, handed over by the engine. args.victim is the only part a
+-- client chose, and the worst it can do is put a name in a ledger that is then only
+-- spent if that name actually dies.
+function LBF_Kills.onHit(player, args)
+    if not LBF_Boards.enabled("pvp") then return end
+    if not player or not args then return end
+
+    local attacker = LBF.nameOf(player)
+    if not attacker then return end
+
+    local victim = args.victim
+    if type(victim) ~= "string" or victim == "" or victim == attacker then return end
+
+    local now = getTimestampMs()
+    LBF_prune(now)
+
+    hits[victim] = hits[victim] or {}
+    hits[victim][attacker] = now
+end
+
+-- player is the victim, handed over by the engine, never read out of args.
+function LBF_Kills.onDeath(player, args)
+    if not LBF_Boards.enabled("pvp") then return end
+    if not player then return end
+
+    local victim = LBF.nameOf(player)
+    if not victim then return end
+
+    local now = getTimestampMs()
+    if now - (lastDeath[victim] or 0) < DEATH_COOLDOWN_MS then return end
+    lastDeath[victim] = now
+
+    LBF_prune(now)
+
+    local ledger = hits[victim]
+    -- nobody hit them inside the window, so this was a zombie, a fall, a fire or hunger.
+    if not ledger then return end
+
+    -- one death spends the whole ledger, whatever comes of it, so a body cannot be
+    -- cashed in twice.
+    hits[victim] = nil
+
+    -- the victim's claim is a hint. it is honoured only where the ledger already agrees,
+    -- and otherwise the most recent attacker takes it.
+    local claimed = args and args.killer
+    local killer = nil
+
+    if type(claimed) == "string" and ledger[claimed] then
+        killer = claimed
+    else
+        local latest = 0
+        for attacker, at in pairs(ledger) do
+            if at > latest then
+                killer, latest = attacker, at
+            end
+        end
+    end
+
+    if not killer or killer == victim then return end
+
+    LBF_State.add(killer, "pvp", 1)
+end
