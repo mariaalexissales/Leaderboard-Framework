@@ -1,0 +1,23 @@
+{
+    "IGUI_LBF_Title": "Leaderboard",
+    "IGUI_LBF_PanelTooltip": "Leaderboard",
+
+    "IGUI_LBF_BoardZombie": "Zombie Kills",
+    "IGUI_LBF_BoardPvP": "Player Kills",
+    "IGUI_LBF_UnitKills": "kills",
+
+    "IGUI_LBF_You": "You",
+    "IGUI_LBF_Unranked": "Unranked",
+    "IGUI_LBF_YourStanding": "Your standing",
+
+    "IGUI_LBF_Connecting": "Waiting for the server...",
+    "IGUI_LBF_Empty": "Nobody has scored yet",
+    "IGUI_LBF_NoBoards": "No leaderboards are enabled on this server",
+
+    "IGUI_LBF_Announce": "%1 has taken first place in %2, with %3 %4!",
+    "IGUI_LBF_AnnounceHalo": "First place in %1!",
+
+    "IGUI_LBF_Reset": "Reset Board",
+    "IGUI_LBF_ResetConfirm": "Wipe every score on this board? This cannot be undone.",
+    "IGUI_LBF_ResetDone": "%1 has been reset."
+}
