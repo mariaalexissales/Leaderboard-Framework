@@ -40,8 +40,8 @@ option PlayerLeaderboardSystem.MinScoreToRank
     page = PlayerLeaderboardSystem, translation = PLS_MinScoreToRank,
 }
 
-option PlayerLeaderboardSystem.CountAdminKills
+option PlayerLeaderboardSystem.IgnoreDebugKills
 {
     type = boolean, default = false,
-    page = PlayerLeaderboardSystem, translation = PLS_CountAdminKills,
+    page = PlayerLeaderboardSystem, translation = PLS_IgnoreDebugKills,
 }

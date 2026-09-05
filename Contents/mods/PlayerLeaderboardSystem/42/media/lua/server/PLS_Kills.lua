@@ -8,25 +8,89 @@ require "PLS_State"
 
 if not PLS.isAuthority() then return end
 
-PLS = PLS or {}
 PLS_Kills = PLS_Kills or {}
 
 -- a client reporting its own zombie kills is trusted only this far in one go. anything
 -- past it is a broken client or somebody editing their counter.
 local MAX_PER_FLUSH = 40
 
--- an elevated account can spawn whatever it likes, so its kills are not a score. the
--- sandbox option is there for staff who play normally, and for a host, who is always admin.
+-- username -> whether that client said it was in debug mode when it last said hello. runtime
+-- only, like the hit ledger further down: a fact about a connection, not a score, with no
+-- business surviving a restart or sitting in the world save.
+local debugMode = {}
+
+-- username -> whether the console has already been told this player's kills are being
+-- dropped. same lifetime as debugMode above, and swept with it.
+local warned = {}
+
+-- the client's own word for it and nothing more. this process cannot see a remote one's
+-- launch flags, and a modified client can simply not send it. what it buys is a staff
+-- member's spawn-and-slaughter session staying off the board; it is not a barrier against
+-- anyone who wants to be on it, which is why nothing destructive hangs off it. a client that
+-- turns debug on mid-session likewise keeps scoring until it next says hello.
+--
+-- the engine only lets an account holding the ConnectWithDebug capability -- role admin, by
+-- default -- join with -debug at all, so in practice this can only ever describe staff.
+function PLS_Kills.setDebug(username, value)
+    if not username then return end
+
+    value = value == true
+
+    -- a player who has been out of debug mode and gone back into it is worth saying again.
+    -- without this the console gets one line per session no matter how the flag moves.
+    if debugMode[username] ~= value then warned[username] = nil end
+
+    debugMode[username] = value
+end
+
+-- b42 has no server-side disconnect event, so names are swept against who is actually online
+-- instead. one that comes back says hello again and is recorded again.
+function PLS_Kills.forgetOffline(online)
+    if not online then return end
+
+    for username in pairs(debugMode) do
+        if not online[username] then
+            debugMode[username] = nil
+            warned[username] = nil
+        end
+    end
+end
+
+-- nil, not false, for a name whose hello has not landed. a kill can beat the handshake --
+-- PLS_ClientState says how easily that one gets lost -- and reading "not told yet" as debug
+-- would empty a board for anyone whose hello was still in flight.
+local function PLS_inDebug(username)
+    -- inside the authority process, not isServer() is singleplayer. nobody is reporting
+    -- because there is nobody to report, so our own flag is the answer, and it covers a
+    -- second splitscreen player, who never sends a hello of their own.
+    if not isServer() then return getCore():getDebug() == true end
+    if not username then return false end
+
+    return debugMode[username] == true
+end
+
+-- opt-in, and off by default. a leaderboard whose shipped settings quietly discard kills is
+-- a worse failure than a staff member's spawn-and-slaughter session turning up on a board,
+-- and it is the one that actually happened: every board sat empty for anyone playing with
+-- -debug, and nothing was logged to say so.
 function PLS_Kills.shouldCount(player)
     if not player then return false end
+    if PLS.sandbox("IgnoreDebugKills", false) ~= true then return true end
 
-    -- getDebug reads this process's own flag, so it catches singleplayer and a host but
-    -- never a remote client. on a dedicated server the role check below is what works.
-    if getCore():getDebug() then return false end
+    local username = PLS.nameOf(player)
+    if not PLS_inDebug(username) then return true end
 
-    if PLS.sandbox("CountAdminKills", false) == true then return true end
+    -- once per player, not once per kill. a silently dropped kill looks exactly like a mod
+    -- that is not loaded, and telling those two apart from the console without reading the
+    -- lua is the whole job of this line.
+    if username and not warned[username] then
+        warned[username] = true
+        PLS.warn(username .. " is in debug mode and IgnoreDebugKills is on,"
+            .. " so their kills are not being counted")
+    end
 
-    return not PLS.isElevated(player)
+    PLS.trace("dropped a kill by " .. tostring(username) .. ": debug mode")
+    return false
 end
 
 function PLS_Kills.creditZombie(username, amount)
@@ -34,6 +98,7 @@ function PLS_Kills.creditZombie(username, amount)
     if not PLS_Boards.enabled("zombie") then return end
 
     PLS_State.add(username, "zombie", amount or 1)
+    PLS.trace("credited " .. username .. " with " .. tostring(amount or 1) .. " on zombie")
 end
 
 local function PLS_onZombieDead(zombie)
@@ -114,7 +179,7 @@ function PLS_Kills.onHit(player, args)
     if not PLS_Boards.enabled("pvp") then return end
     if not player or not args then return end
     -- filtered here rather than at the death, because the credit is spent by name and the
-    -- player object is only in hand on this side of it. an elevated player never enters the
+    -- player object is only in hand on this side of it. a client in debug never enters the
     -- ledger, so no kill can be credited to them; being killed by one still counts.
     if not PLS_Kills.shouldCount(player) then return end
 

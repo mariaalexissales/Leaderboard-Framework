@@ -12,6 +12,11 @@ PLS.Config = PLS.Config or {
     -- client reports its own vanilla kill counter instead, which is clamped but cheaper
     -- to cheat.
     clientKillReporting = false,
+
+    -- per-kill tracing. off in anything shipped: a horde is a line a second per player.
+    -- turn it on when a board is not filling and nothing is being logged, which is the
+    -- shape a scoring bug takes here -- an early return that says nothing on its way out.
+    verbose = false,
 }
 
 -- server/ lua loads on multiplayer clients too, and isServer() is false in singleplayer.
@@ -35,28 +40,28 @@ function PLS.accessLevel(player)
     return string.lower(level)
 end
 
+-- "may this player press the admin button". the old test asked whether there was a remote
+-- server, which is false in the server process too, so on a dedicated server this returned
+-- true before it ever looked at a role and handed the reset command to everybody. the
+-- question is really "is there no multiplayer at all", and that is both flags off.
 function PLS.isAdmin(player)
-    if not PLS.hasRemoteServer() then return true end
+    if not isClient() and not isServer() then return true end
     if not player then return false end
 
     local level = PLS.accessLevel(player)
     return level == "admin" or level == "gm" or level == "moderator"
 end
 
--- isAdmin answers "may this player press the admin button" and is deliberately true with no
--- remote server. this answers "should this player's kills count", which is a different
--- question and must not be true just because nobody is hosting.
-function PLS.isElevated(player)
-    if not player then return false end
-    return PLS.accessLevel(player) ~= "none"
-end
-
-function PLS.log(message)
-    print("[PLS] " .. tostring(message))
-end
-
 function PLS.warn(message)
     print("[PLS] WARN: " .. tostring(message))
+end
+
+-- the counterpart to warn, for the ordinary path rather than the broken one. a kill that is
+-- deliberately not counted is not a fault and must not warn on every swing, but a scoring
+-- path that says nothing at all cannot be told apart from one that is not running.
+function PLS.trace(message)
+    if not PLS.Config.verbose then return end
+    print("[PLS] " .. tostring(message))
 end
 
 -- a handler that throws is simply called again on the next event, so one that fires on a
@@ -98,13 +103,6 @@ function PLS.guard(name, event, fn)
 
     event.Add(wrapped)
     return wrapped
-end
-
--- getText on a missing key returns the key, which would print IGUI_PLS_BoardPvP in the UI.
-function PLS.text(key, fallback)
-    local value = getTextOrNull(key)
-    if value and value ~= "" then return value end
-    return fallback or key
 end
 
 -- SandboxVars is nil until the world loads, and the client's copy arrives a little after
