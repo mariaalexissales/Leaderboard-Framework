@@ -7,7 +7,6 @@ require "PLS_Boards"
 
 if not PLS.isAuthority() then return end
 
-PLS = PLS or {}
 PLS_State = PLS_State or {}
 
 local TABLE_NAME = "PLS_Scores"

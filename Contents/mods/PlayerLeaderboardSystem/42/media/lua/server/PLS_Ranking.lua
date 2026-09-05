@@ -9,7 +9,6 @@ require "PLS_State"
 
 if not PLS.isAuthority() then return end
 
-PLS = PLS or {}
 PLS_Ranking = PLS_Ranking or {}
 
 -- a horde is a kill every second or so per player. without this the board would be
@@ -61,7 +60,9 @@ function PLS_Ranking.ranked(board)
 end
 
 -- dense from 1 and short keys: this goes over the wire on every recompute, to everybody.
-local function PLS_wire(ranked, limit)
+-- BoardSize is read here rather than passed in, so the two callers cannot disagree.
+local function PLS_wire(ranked)
+    local limit = tonumber(PLS.sandbox("BoardSize", 10)) or 10
     local rows = {}
     for i = 1, math.min(#ranked, limit) do
         rows[i] = { n = ranked[i].name, s = ranked[i].score }
@@ -138,8 +139,7 @@ function PLS_Ranking.recompute(board)
     if not PLS_Boards.enabled(board) then return end
 
     local ranked = PLS_Ranking.ranked(board)
-    local limit = tonumber(PLS.sandbox("BoardSize", 10)) or 10
-    local rows = PLS_wire(ranked, limit)
+    local rows = PLS_wire(ranked)
 
     PLS_checkLeader(board, ranked)
 
@@ -152,11 +152,9 @@ end
 function PLS_Ranking.sendAll(player)
     if not player then return end
 
-    local limit = tonumber(PLS.sandbox("BoardSize", 10)) or 10
-
     for _, def in ipairs(PLS_Boards.ordered()) do
         local ranked = PLS_Ranking.ranked(def.key)
-        PLS_Ranking.send(player, def.key, ranked, PLS_wire(ranked, limit))
+        PLS_Ranking.send(player, def.key, ranked, PLS_wire(ranked))
     end
 end
 

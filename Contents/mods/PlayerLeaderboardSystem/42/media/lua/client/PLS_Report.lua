@@ -6,7 +6,6 @@ require "PLS_Core"
 require "PLS_Net"
 require "PLS_Boards"
 
-PLS = PLS or {}
 PLS_Report = PLS_Report or {}
 
 -- the server ledger only cares that a hit happened recently, not how many landed, so a

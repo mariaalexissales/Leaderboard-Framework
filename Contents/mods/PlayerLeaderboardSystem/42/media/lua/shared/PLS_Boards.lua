@@ -4,7 +4,6 @@
 
 require "PLS_Core"
 
-PLS = PLS or {}
 PLS_Boards = PLS_Boards or {}
 
 PLS_Boards.defs = PLS_Boards.defs or {}
@@ -54,14 +53,6 @@ end
 local function PLS_byOrder(a, b)
     if a.order ~= b.order then return a.order < b.order end
     return a.key < b.key
-end
-
--- every board, gate or no gate. the server scores into these.
-function PLS_Boards.all()
-    local list = {}
-    for _, def in pairs(PLS_Boards.defs) do list[#list + 1] = def end
-    table.sort(list, PLS_byOrder)
-    return list
 end
 
 -- only the boards the sandbox has switched on. the panel draws these.
