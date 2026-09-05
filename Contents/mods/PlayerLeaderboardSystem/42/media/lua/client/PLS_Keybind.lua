@@ -6,7 +6,8 @@ require "PLS_Panel"
 
 local BIND = "Toggle Leaderboard"
 
--- copies Vanilla's Q radial press thing
+-- vanilla's Q radial splits a tap from a hold at the same figure. matching it means the
+-- two do not ask for different timing from the same finger.
 local HOLD_MS = 250
 
 keyBinding = keyBinding or {}
@@ -22,7 +23,8 @@ local function PLS_boundKey()
     return key
 end
 
--- did this to ignore keybind when focused on chat window
+-- a bound key still reaches this handler while chat has focus, so without it somebody
+-- typing into a message would have the panel opening underneath them.
 local function PLS_blocked()
     if ISChat and ISChat.focused then return true end
     return false

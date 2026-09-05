@@ -186,8 +186,8 @@ local function PLS_ensurePopup(panel)
     panel.PLS_popup:setTextures(textureWidth)
 end
 
--- it just sits there now, the way the rest of the column does. tutorial is the one place
--- the sidebar is not the player's to poke at.
+-- the cell is always up, the way the rest of the column is. tutorial is the one place the
+-- sidebar is not the player's to poke at.
 local function PLS_updateVisibility(panel)
     if not panel or not panel.PLS_popup then return end
     if not PLS_isCurrentPanel(panel) then return end
