@@ -2,7 +2,6 @@
 --ESTRAL--
 ----------
 
-PLS = PLS or {}
 PLS_Theme = PLS_Theme or {}
 
 -- NeatUI's end caps take a tint and the body does not, so state is carried by tinting
@@ -24,7 +23,6 @@ PLS_Theme.COL_FRAME = { r = 1, g = 1, b = 1, a = 0.09 }
 PLS_Theme.COL_WELL = { r = 0, g = 0, b = 0, a = 0.25 }
 
 PLS_Theme.COL_TITLE = { r = 0.90, g = 0.91, b = 0.90 }
-PLS_Theme.COL_TEXT = { r = 0.68, g = 0.68, b = 0.68 }
 PLS_Theme.COL_DIM = { r = 0.50, g = 0.50, b = 0.50 }
 PLS_Theme.COL_SCORE = { r = 0.80, g = 0.74, b = 0.50 }
 
@@ -36,6 +34,17 @@ PLS_Theme.COL_THIRD = { r = 0.80, g = 0.58, b = 0.38 }
 PLS_Theme.COL_REST = { r = 0.38, g = 0.38, b = 0.38 }
 
 PLS_Theme.COL_ME = { r = 0.55, g = 0.80, b = 0.95 }
+
+-- drawRect and drawRectBorder both take alpha first and the channels after, which is the
+-- opposite order to the tables above. spelling that out at the call site is four chances
+-- to get it wrong and no complaint when you do.
+function PLS_Theme.fill(ui, x, y, w, h, colour)
+    ui:drawRect(x, y, w, h, colour.a, colour.r, colour.g, colour.b)
+end
+
+function PLS_Theme.frame(ui, x, y, w, h, colour)
+    ui:drawRectBorder(x, y, w, h, colour.a, colour.r, colour.g, colour.b)
+end
 
 function PLS_Theme.rankColour(rank)
     if rank == 1 then return PLS_Theme.COL_FIRST end

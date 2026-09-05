@@ -11,7 +11,6 @@ require "PLS_Button"
 require "PLS_Row"
 require "PLS_ClientState"
 
-PLS = PLS or {}
 PLS.players = PLS.players or {}
 
 PLS_Panel = ISCollapsableWindow:derive("PLS_Panel")
@@ -60,6 +59,13 @@ function PLS_Panel:bands()
     return tabY, listY, footerY
 end
 
+-- the well is drawn to the band, and the scroll view sits one pixel inside it so the
+-- frame is not painted over. createChildren and onResize both need that same inset.
+function PLS_Panel:listBounds()
+    local _, listY, footerY = self:bands()
+    return PAD + 1, listY + 1, self.width - PAD * 2 - 2, footerY - listY - GAP - 2
+end
+
 -- anchors are applied by instantiate(), so they have to be assigned before it runs.
 function PLS_Panel:attach(button, anchors)
     for key, value in pairs(anchors or {}) do button[key] = value end
@@ -72,7 +78,7 @@ end
 function PLS_Panel:createChildren()
     ISCollapsableWindow.createChildren(self)
 
-    local tabY, listY, footerY = self:bands()
+    local tabY, _, footerY = self:bands()
 
     self.tabs = {}
     local x = PAD
@@ -89,9 +95,9 @@ function PLS_Panel:createChildren()
 
     if not self.tab and self.tabs[1] then self.tab = self.tabs[1].board end
 
-    local listHeight = footerY - listY - GAP - 2
+    local listX, listTop, listWidth, listHeight = self:listBounds()
 
-    self.list = NIVirtualScrollView:new(PAD + 1, listY + 1, self.width - PAD * 2 - 2, listHeight)
+    self.list = NIVirtualScrollView:new(listX, listTop, listWidth, listHeight)
     self.list:initialise()
     self.list:instantiate()
     -- setOnCreateItem after instantiate: createChildren already ran initializePool once
@@ -189,11 +195,10 @@ function PLS_Panel:prerender()
 
     local _, listY, footerY = self:bands()
     local listW = self.width - PAD * 2
+    local listH = footerY - listY - GAP
 
-    self:drawRect(PAD, listY, listW, footerY - listY - GAP,
-        PLS_Theme.COL_WELL.a, PLS_Theme.COL_WELL.r, PLS_Theme.COL_WELL.g, PLS_Theme.COL_WELL.b)
-    self:drawRectBorder(PAD, listY, listW, footerY - listY - GAP,
-        PLS_Theme.COL_FRAME.a, PLS_Theme.COL_FRAME.r, PLS_Theme.COL_FRAME.g, PLS_Theme.COL_FRAME.b)
+    PLS_Theme.fill(self, PAD, listY, listW, listH, PLS_Theme.COL_WELL)
+    PLS_Theme.frame(self, PAD, listY, listW, listH, PLS_Theme.COL_FRAME)
 
     for _, button in ipairs(self.tabs or {}) do
         button.selected = button.board == self.tab
@@ -220,13 +225,12 @@ function PLS_Panel:render()
     end
 
     if #self.rows == 0 then
-        local text = PLS_ClientState.ready and getText("IGUI_PLS_Empty")
+        local text = PLS_ClientState.isSeen(self.tab) and getText("IGUI_PLS_Empty")
             or getText("IGUI_PLS_Connecting")
         self:drawText(text, PAD + 10, listY + 10, dim.r, dim.g, dim.b, 1, font)
     end
 
-    self:drawRect(PAD, footerY - GAP / 2, self.width - PAD * 2, 1,
-        PLS_Theme.COL_FRAME.a, PLS_Theme.COL_FRAME.r, PLS_Theme.COL_FRAME.g, PLS_Theme.COL_FRAME.b)
+    PLS_Theme.fill(self, PAD, footerY - GAP / 2, self.width - PAD * 2, 1, PLS_Theme.COL_FRAME)
 
     -- the player's own standing, sent alongside the board, so it is right even when they
     -- are nowhere near the part of it they can see.
@@ -265,10 +269,10 @@ function PLS_Panel:onResize()
     ISCollapsableWindow.onResize(self)
     if not self.list then return end
 
-    local _, listY, footerY = self:bands()
-    local listHeight = footerY - listY - GAP - 2
+    local _, _, footerY = self:bands()
+    local _, _, listWidth, listHeight = self:listBounds()
 
-    self.list:setWidth(self.width - PAD * 2 - 2)
+    self.list:setWidth(listWidth)
     self.list:setHeight(listHeight)
 
     -- setConfig rebuilds the whole widget pool and onResize fires every frame of a drag,
@@ -309,12 +313,11 @@ function PLS.openPanel(player, pinned)
     local playerNum = player:getPlayerNum()
     if playerNum ~= 0 then return end
 
-    -- a join that missed the handshake would otherwise sit on "waiting" until somebody
-    -- else scores, so looking at the panel is itself a reason to ask again.
-    if not PLS_ClientState.ready then
-        PLS_ClientState.rearm()
-        PLS_ClientState.requestBoards()
-    end
+    -- a join that missed the handshake would otherwise sit on "waiting" until somebody else
+    -- scores, so looking at the panel is itself a reason to ask again -- every time, not only
+    -- before the first reply ever, or the panel never shows anything newer than what arrived
+    -- once. the pacing is in requestOnOpen, because the keybind opens this on every peek.
+    PLS_ClientState.requestOnOpen()
 
     -- NeatUI is declared in mod.info, but a client that has somehow loaded us without it
     -- would otherwise index a nil and take the whole ui down with it.
@@ -347,11 +350,6 @@ function PLS.openPanel(player, pinned)
     window:addToUIManager()
 
     data.instance = window
-end
-
-function PLS.closePanel(player)
-    local window = PLS.getWindow(player and player:getPlayerNum() or 0)
-    if window then window:close() end
 end
 
 function PLS.togglePanel(player)
