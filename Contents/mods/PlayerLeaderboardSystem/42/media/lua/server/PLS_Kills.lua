@@ -374,7 +374,15 @@ function PLS_Kills.onDeath(player, args)
     -- both read before anything below changes them: endLife wipes the runs, and crediting
     -- the kill can move the top of a board.
     local runs = PLS_runsOf(victim, boards)
-    local topped, toppedScore = PLS_toppedBoard(victim, boards)
+
+    -- only the slain line reads this, and that line is unreachable with player kills off --
+    -- so asking on a server that does not track them is a board sorted for an answer nobody
+    -- ever looks at. still asked here rather than later, for the reason above: by the time
+    -- the ledger below has been spent, the credit has already moved the top of the board.
+    local topped, toppedScore
+    if PLS_Boards.tracked("pvp") then
+        topped, toppedScore = PLS_toppedBoard(victim, boards)
+    end
 
     -- first, and whatever comes of the ledger below: the run is over however it ended, and
     -- most deaths are not pvp at all. a client can send a death it did not have, and all
