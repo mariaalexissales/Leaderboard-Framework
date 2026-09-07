@@ -31,12 +31,6 @@
   "Sandbox_PLS_MinScoreToRank": "Minimum Score To Rank",
   "Sandbox_PLS_MinScoreToRank_tooltip": "A player needs at least this much to appear on a board, so the list is not padded with everyone sitting on nothing. (1-1000)",
 
-  "Sandbox_PLS_BackupIntervalMinutes": "Backup Every",
-  "Sandbox_PLS_BackupIntervalMinutes_tooltip": "Real minutes between writes of the score backup, a plain JSON file kept in the Zomboid/Lua folder rather than inside the world save. Scores normally live in the save, which means a server that is killed instead of shut down loses them, and a rollback takes them with it. Set to 0 to switch the backup off entirely. (0-60)",
-
-  "Sandbox_PLS_BackupRestore": "Restore From Backup",
-  "Sandbox_PLS_BackupRestore_tooltip": "On startup, load the backup when it is newer than what came out of the world save. This is what makes the scores survive a crash or a rollback. Turn it off if you are wiping to a fresh world and want the old file ignored rather than deleted.",
-
   "Sandbox_PLS_IgnoreDebugKills": "Ignore Debug-Mode Kills",
   "Sandbox_PLS_IgnoreDebugKills_tooltip": "Off by default, so every kill counts. Turn it on to keep kills made in debug mode off the boards, for staff who spawn things in to test them. Only an admin account can join in debug mode at all, and the client reports its own mode, so this is a courtesy rather than anti-cheat. Everyone else scores either way."
 }

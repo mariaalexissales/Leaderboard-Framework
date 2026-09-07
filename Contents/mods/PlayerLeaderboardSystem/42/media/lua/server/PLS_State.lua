@@ -35,9 +35,6 @@ function PLS_State.ensure()
     -- purpose: a restart must not hand everybody a fresh run.
     --   username -> { zombie = n, pvp = n, h = hours survived when last seen }
     data.lives = data.lives or {}
-    -- epoch ms, moved by markDirty. only ever readable at boot if the engine actually wrote
-    -- the save, which is the whole basis of the comparison PLS_Backup makes.
-    data.savedAt = data.savedAt or 0
 
     return data
 end
@@ -70,13 +67,6 @@ function PLS_State.markDirty(board)
     if not board then return end
 
     PLS_State.dirty[board] = true
-
-    -- when this table's contents last moved. PLS_Backup compares it against the stamp inside
-    -- the backup file to decide which of the two is the truth after a restart, so it has to
-    -- move whenever a score does. read straight off .data rather than through ensure(): this
-    -- runs once per kill, and by the time anything scores the table is long since built.
-    local data = PLS_State.data
-    if data then data.savedAt = PLS.now() end
 end
 
 function PLS_State.add(username, board, amount)
