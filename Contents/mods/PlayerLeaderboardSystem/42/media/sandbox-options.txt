@@ -64,6 +64,18 @@ option PlayerLeaderboardSystem.MinScoreToRank
     page = PlayerLeaderboardSystem, translation = PLS_MinScoreToRank,
 }
 
+option PlayerLeaderboardSystem.BackupIntervalMinutes
+{
+    type = integer, min = 0, max = 60, default = 5,
+    page = PlayerLeaderboardSystem, translation = PLS_BackupIntervalMinutes,
+}
+
+option PlayerLeaderboardSystem.BackupRestore
+{
+    type = boolean, default = true,
+    page = PlayerLeaderboardSystem, translation = PLS_BackupRestore,
+}
+
 option PlayerLeaderboardSystem.IgnoreDebugKills
 {
     type = boolean, default = false,

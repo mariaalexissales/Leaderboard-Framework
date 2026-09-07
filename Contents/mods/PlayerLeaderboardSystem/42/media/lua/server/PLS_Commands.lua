@@ -8,6 +8,7 @@ require "PLS_Boards"
 require "PLS_State"
 require "PLS_Kills"
 require "PLS_Ranking"
+require "PLS_Backup"
 
 if not PLS.isAuthority() then return end
 
@@ -120,6 +121,10 @@ function PLS_Commands.handlers.reset(player, args)
 
     PLS_State.resetBoard(board)
     PLS_Ranking.recompute(board)
+
+    -- straight to disk. the backup is whole-table and newest-wins, so a wipe that only lived
+    -- in memory would be undone by the very next restart.
+    PLS_Backup.save()
 
     PLS_Net.toClient(player, "toast", { kind = "reset", board = board })
 end
