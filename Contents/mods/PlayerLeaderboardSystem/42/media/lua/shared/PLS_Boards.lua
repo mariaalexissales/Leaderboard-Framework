@@ -8,29 +8,22 @@ PLS_Boards = PLS_Boards or {}
 
 PLS_Boards.defs = PLS_Boards.defs or {}
 
--- another mod can call this from its own shared/ file to add a board. it gets a column in
--- the panel and a first-place broadcast for free; all it has to do afterwards is call
--- PLS_State.add(username, key, n) on the server when its own thing happens.
+-- another mod calls this from its own shared/ file to add a board, and gets a panel column
+-- and a first-place broadcast for free. it then calls PLS_State.add(username, key, n) on the
+-- server when its own thing happens.
 --
---   key        the name the score is stored under. must be unique.
+--   key        what the score is stored under. must be unique.
 --   order      left-to-right tab position.
---   title      IGUI_ translation key for the tab.
---   unit       IGUI_ translation key for what the number counts.
---   sandbox    option name under SandboxVars.PlayerLeaderboardSystem that gates the board.
---              omit it and the board is always on.
---
--- the panel draws one row of tabs, kill type on the left and scope on the right, so a board
--- also says where it sits in it:
---
---   group      which left-hand tab the board belongs to. defaults to the key, which makes a
---              board registered without one a group of itself and draws it as the single
---              tab it has always been.
+--   title      IGUI_ key for the tab.
+--   unit       IGUI_ key for what the number counts.
+--   sandbox    SandboxVars.PlayerLeaderboardSystem option gating the board. omit for always on.
+--   group      which left-hand tab. defaults to the key, making a lone board a group of itself.
 --   groupTitle IGUI_ key for that left-hand tab. taken from the group's first board.
---   scope      which right-hand tab, within the group. "life" or "account" here; only
---              meaningful once a group holds more than one board.
---   announce   IGUI_ key for the board's full name in chat, where a tab label like
---              "Per Life" says nothing on its own. defaults to title.
---   requires   a second sandbox option that must also be on. a per-life board rides on its
+--   scope      which right-hand tab within the group: "life" or "account". only meaningful
+--              once a group holds more than one board.
+--   announce   IGUI_ key for the full name in chat, where a tab label like "Per Life" says
+--              nothing alone. defaults to title.
+--   requires   a second sandbox option that must also be on -- a per-life board rides on its
 --              kind being tracked at all.
 function PLS_Boards.register(def)
     if not def or not def.key then
@@ -56,14 +49,14 @@ function PLS_Boards.get(key)
     return key and PLS_Boards.defs[key] or nil
 end
 
--- read at call time, never cached: SandboxVars is nil while lua is still loading, and on a
--- client it arrives a beat after that.
+-- read at call time, never cached: SandboxVars is nil while lua loads, and arrives a beat
+-- later on a client.
 function PLS_Boards.enabled(key)
     local def = PLS_Boards.get(key)
     if not def then return false end
 
-    -- checked before the board's own switch, so a server that has turned player kills off
-    -- cannot be handed a player kills board back through the per-life door.
+    -- before the board's own switch, so a server with player kills off cannot be handed one
+    -- back through the per-life door.
     if def.requires and PLS.sandbox(def.requires, false) ~= true then return false end
 
     if not def.sandbox then return true end
@@ -86,8 +79,8 @@ function PLS_Boards.ordered()
     return list
 end
 
--- the left-hand tabs: one entry per group, in the order of its earliest board. ordered() is
--- already sorted, so first appearance is lowest order and there is nothing to sort again.
+-- the left-hand tabs, one per group. ordered() is already sorted, so first appearance is
+-- lowest order and there is nothing to sort again.
 function PLS_Boards.groups()
     local seen = {}
     local list = {}
@@ -102,8 +95,8 @@ function PLS_Boards.groups()
     return list
 end
 
--- the right-hand tabs: the enabled boards inside one group, in order. a group holding one
--- board draws no scope tab at all, which is what a third-party board gets.
+-- the right-hand tabs: enabled boards inside one group. a group of one draws no scope tab,
+-- which is what a third-party board gets.
 function PLS_Boards.scopes(group)
     local list = {}
 
@@ -114,9 +107,8 @@ function PLS_Boards.scopes(group)
     return list
 end
 
--- a group and a scope back to the board key they name, enabled or not. the credit path
--- leans on this as much as the panel does: a kill's kind is its group, so one kill can find
--- both of its boards without either key being written down a second time.
+-- group and scope back to the board key, enabled or not. a kill's kind is its group, so the
+-- credit path finds both of its boards without either key being written down twice.
 function PLS_Boards.find(group, scope)
     if not group or not scope then return nil end
 
@@ -127,9 +119,8 @@ function PLS_Boards.find(group, scope)
     return nil
 end
 
--- whether a group has any board left switched on. what a kill of that kind is worth asking
--- before it is worth counting, and the reason it is a group rather than a key: turning the
--- account board off must not quietly take the per-life one down with it.
+-- whether a group has any board still on -- asked before a kill of that kind is worth
+-- counting. by group, not key: turning the account board off must not take per-life with it.
 function PLS_Boards.tracked(group)
     if not group then return false end
 
@@ -140,8 +131,8 @@ function PLS_Boards.tracked(group)
     return false
 end
 
--- whether anything at all is keeping a per-life count. the death packet is gated on this at
--- both ends, and the test lives here so the client and the server ask one question.
+-- whether anything keeps a per-life count. the death packet is gated on this at both ends,
+-- and the test lives here so client and server ask one question.
 function PLS_Boards.anyLife()
     for key, def in pairs(PLS_Boards.defs) do
         if def.scope == "life" and PLS_Boards.enabled(key) then return true end
@@ -150,8 +141,8 @@ function PLS_Boards.anyLife()
     return false
 end
 
--- per life sits left of all time in both groups, so the panel opens on the board that
--- rewards the run somebody is on rather than the one a thousand hours already decided.
+-- per life sits left of all time in both groups, so the panel opens on the board rewarding
+-- the run somebody is on rather than one a thousand hours already decided.
 PLS_Boards.register({
     key = "zombieLife",
     order = 1,

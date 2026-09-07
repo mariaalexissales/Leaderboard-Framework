@@ -12,41 +12,40 @@ if not PLS.isAuthority() then return end
 
 PLS_Kills = PLS_Kills or {}
 
--- a client reporting its own zombie kills is trusted only this far in one go. anything
--- past it is a broken client or somebody editing their counter.
+-- how far a client reporting its own kills is trusted in one go. past this is a broken client
+-- or an edited counter.
 local MAX_PER_FLUSH = 40
 
--- username -> whether that client said it was in debug mode when it last said hello. runtime
--- only, like the hit ledger further down: a fact about a connection, not a score, with no
--- business surviving a restart or sitting in the world save.
+-- username -> whether that client claimed debug mode at its last hello. runtime only, like the
+-- hit ledger below: a fact about a connection, not a score.
 local debugMode = {}
 
--- username -> whether the console has already been told this player's kills are being
--- dropped. same lifetime as debugMode above, and swept with it.
+-- username -> whether the console has already been told this player's kills are dropped.
+-- swept with debugMode.
 local warned = {}
 
--- the client's own word for it and nothing more. this process cannot see a remote one's
--- launch flags, and a modified client can simply not send it. what it buys is a staff
--- member's spawn-and-slaughter session staying off the board; it is not a barrier against
--- anyone who wants to be on it, which is why nothing destructive hangs off it. a client that
--- turns debug on mid-session likewise keeps scoring until it next says hello.
+-- the client's own word and nothing more: this process cannot see a remote client's launch
+-- flags, and a modified one can simply not send it. it keeps a staff spawn-and-slaughter
+-- session off the board; it is not a barrier against anyone who wants on it, which is why
+-- nothing destructive hangs off it. debug turned on mid-session keeps scoring until the next
+-- hello.
 --
--- the engine only lets an account holding the ConnectWithDebug capability -- role admin, by
--- default -- join with -debug at all, so in practice this can only ever describe staff.
+-- the engine only lets an account with ConnectWithDebug (admin by default) join with -debug,
+-- so in practice this only ever describes staff.
 function PLS_Kills.setDebug(username, value)
     if not username then return end
 
     value = value == true
 
-    -- a player who has been out of debug mode and gone back into it is worth saying again.
-    -- without this the console gets one line per session no matter how the flag moves.
+    -- out of debug and back into it is worth saying again; otherwise the console gets one
+    -- line per session however the flag moves.
     if debugMode[username] ~= value then warned[username] = nil end
 
     debugMode[username] = value
 end
 
--- b42 has no server-side disconnect event, so names are swept against who is actually online
--- instead. one that comes back says hello again and is recorded again.
+-- b42 has no server-side disconnect event, so names are swept against who is online. one that
+-- comes back says hello again.
 function PLS_Kills.forgetOffline(online)
     if not online then return end
 
@@ -62,23 +61,21 @@ function PLS_Kills.forgetOffline(online)
     end
 end
 
--- nil, not false, for a name whose hello has not landed. a kill can beat the handshake --
--- PLS_ClientState says how easily that one gets lost -- and reading "not told yet" as debug
--- would empty a board for anyone whose hello was still in flight.
+-- nil, not false, for a name whose hello has not landed: a kill can beat the handshake, and
+-- reading "not told yet" as debug would empty a board for anyone still in flight.
 local function PLS_inDebug(username)
-    -- inside the authority process, not isServer() is singleplayer. nobody is reporting
-    -- because there is nobody to report, so our own flag is the answer, and it covers a
-    -- second splitscreen player, who never sends a hello of their own.
+    -- inside the authority process, not isServer() is singleplayer -- nobody is reporting
+    -- because there is nobody to report. covers a second splitscreen player, who never sends
+    -- a hello of their own.
     if not isServer() then return getCore():getDebug() == true end
     if not username then return false end
 
     return debugMode[username] == true
 end
 
--- opt-in, and off by default. a leaderboard whose shipped settings quietly discard kills is
--- a worse failure than a staff member's spawn-and-slaughter session turning up on a board,
--- and it is the one that actually happened: every board sat empty for anyone playing with
--- -debug, and nothing was logged to say so.
+-- opt-in and off by default. shipped settings that quietly discard kills are a worse failure
+-- than a staff rampage on a board -- and it is the one that actually happened: every board sat
+-- empty for anyone playing with -debug, with nothing logged to say so.
 function PLS_Kills.shouldCount(player)
     if not player then return false end
     if PLS.sandbox("IgnoreDebugKills", false) ~= true then return true end
@@ -86,9 +83,8 @@ function PLS_Kills.shouldCount(player)
     local username = PLS.nameOf(player)
     if not PLS_inDebug(username) then return true end
 
-    -- once per player, not once per kill. a silently dropped kill looks exactly like a mod
-    -- that is not loaded, and telling those two apart from the console without reading the
-    -- lua is the whole job of this line.
+    -- once per player, not per kill. a silently dropped kill looks exactly like a mod that is
+    -- not loaded, and this line is what tells them apart from the console.
     if username and not warned[username] then
         warned[username] = true
         PLS.warn(username .. " is in debug mode and IgnoreDebugKills is on,"
@@ -99,9 +95,9 @@ function PLS_Kills.shouldCount(player)
     return false
 end
 
--- one kill, every enabled board for its kind. the best-life board is a high-water mark raised
--- as the run passes it rather than banked when the run ends, so a player who has not died in a
--- month still shows the run they are actually on.
+-- one kill, every enabled board for its kind. the best-life board is raised as the run passes
+-- it rather than banked at death, so a player who has not died in a month still shows the run
+-- they are on.
 function PLS_Kills.credit(username, kind, amount)
     if not username or not kind then return end
 
@@ -135,8 +131,8 @@ local function PLS_onZombieDead(zombie)
     if PLS.Config.clientKillReporting then return end
     if not zombie then return end
 
-    -- OnZombieDead passes the zombie and nothing else, so the killer comes off the zombie.
-    -- nil for fire, falls and cars, and anything that is not a player has no username.
+    -- OnZombieDead passes the zombie and nothing else, so the killer comes off it. nil for
+    -- fire, falls and cars; anything not a player has no username.
     local attacker = zombie:getAttackedBy()
     if not attacker or not instanceof(attacker, "IsoPlayer") then return end
     if not PLS_Kills.shouldCount(attacker) then return end
@@ -146,10 +142,9 @@ end
 
 PLS.guard("zombie kill credit", Events.OnZombieDead, PLS_onZombieDead)
 
--- the fallback path, off unless PLS.Config.clientKillReporting is set. some dedicated
--- servers hand back a nil attacker on every kill, which leaves the board permanently
--- empty; a client diffing its own vanilla kill counter at least fills it. the count is
--- all the server takes, and it is clamped.
+-- fallback, off unless PLS.Config.clientKillReporting. some dedicated servers hand back a nil
+-- attacker on every kill, leaving the board permanently empty; a client diffing its own
+-- vanilla counter at least fills it. only the count is taken, and it is clamped.
 function PLS_Kills.onReported(player, args)
     if not PLS.Config.clientKillReporting then return end
     if not player or not args then return end
@@ -174,22 +169,18 @@ end
 -- player kills
 -- ----------------------------------------------------------------------------
 --
--- combat is resolved on the attacking client, so the server never sees the swing that
--- landed. it is told about the kill twice instead, from both ends, and only credits one
--- when the two agree:
+-- combat resolves on the attacking client, so the server never sees the swing. it is told
+-- twice instead and credits only where the two agree: the attacker's client reports "i hit
+-- this player" into a short-lived ledger, the victim's reports "i died, and this is who".
 --
---   the attacker's client reports "i hit this player" and the server writes that into a
---   short-lived ledger. the victim's client reports "i died, and this is who did it".
---
--- the credit is taken from the ledger, not from the victim's claim. so a victim cannot
--- hand first place to a friend who never touched them, and an attacker cannot credit
--- themselves without a real hit landing on someone who really died.
+-- the credit comes from the ledger, not the victim's claim. so a victim cannot hand first
+-- place to a friend who never touched them, and an attacker cannot credit themselves without
+-- a real hit landing on someone who really died.
 
 local HIT_WINDOW_MS = 30000
 local DEATH_COOLDOWN_MS = 3000
 
--- runtime only, both of them. a thirty second ledger and a rate limit have no business
--- surviving a restart or sitting in the world save.
+-- runtime only: a thirty second ledger and a rate limit have no business in the world save.
 local hits = {}
 local lastDeath = {}
 
@@ -202,15 +193,14 @@ local function PLS_prune(now)
     end
 end
 
--- player is the attacker, handed over by the engine. args.victim is the only part a
--- client chose, and the worst it can do is put a name in a ledger that is then only
--- spent if that name actually dies.
+-- player is the attacker, from the engine. args.victim is the only client-chosen part, and the
+-- worst it does is put a name in a ledger only spent if that name actually dies.
 function PLS_Kills.onHit(player, args)
     if not PLS_Boards.tracked("pvp") then return end
     if not player or not args then return end
-    -- filtered here rather than at the death, because the credit is spent by name and the
-    -- player object is only in hand on this side of it. a client in debug never enters the
-    -- ledger, so no kill can be credited to them; being killed by one still counts.
+    -- filtered here, not at the death: the credit is spent by name and the player object is
+    -- only in hand on this side. a client in debug never enters the ledger, so nothing can be
+    -- credited to them; being killed by one still counts.
     if not PLS_Kills.shouldCount(player) then return end
 
     local attacker = PLS.nameOf(player)
@@ -230,15 +220,13 @@ end
 -- the two announcements a death is worth
 -- ----------------------------------------------------------------------------
 --
--- both read the per-life boards and nothing else. an all-time board is cumulative, so a
--- death costs whoever tops it exactly nothing, and saying otherwise in chat would be a lie
--- everyone can check.
+-- both read per-life boards only. an all-time board is cumulative, so a death costs whoever
+-- tops it nothing, and saying otherwise would be a lie everyone can check.
 
 local ANNOUNCE_TOP = 3
 
--- username -> when an upset was last announced about them. runtime only, like the ledger and
--- the debug map above, and swept with them. on the table rather than a local so the sweep,
--- which runs further up this file, can reach it.
+-- username -> when an upset was last announced about them. runtime only, swept with the maps
+-- above. on the table rather than a local so the sweep further up can reach it.
 PLS_Kills.lastUpset = PLS_Kills.lastUpset or {}
 
 -- the enabled per-life boards, in registry order.
@@ -252,10 +240,8 @@ local function PLS_lifeBoards()
     return list
 end
 
--- keyed by group, because that is what a run is counted under.
---
--- the board list is passed in rather than asked for. a death used to call PLS_lifeBoards three
--- times over, and each call reads the sandbox once per registered board and sorts the result.
+-- keyed by group, which is what a run is counted under. the board list is passed in: a death
+-- used to call PLS_lifeBoards three times, each reading the sandbox per board and sorting.
 local function PLS_runsOf(victim, boards)
     local runs = {}
 
@@ -266,8 +252,8 @@ local function PLS_runsOf(victim, boards)
     return runs
 end
 
--- whether an upset about this player is wanted and due. the stamp is spent by the caller and
--- only once something is actually said, so a quiet death does not burn the window.
+-- the stamp is spent by the caller and only once something is said, so a quiet death does not
+-- burn the window.
 local function PLS_upsetReady(victim, now)
     if PLS.sandbox("AnnounceUpsets", true) ~= true then return false end
 
@@ -275,27 +261,26 @@ local function PLS_upsetReady(victim, now)
     return now - (PLS_Kills.lastUpset[victim] or 0) >= cooldown
 end
 
--- the first per-life board this player is top of, or nil. read before the kill is credited:
--- the credit can push the killer past the very record they just ended, and asking afterwards
--- would find the killer at the top and nobody who had been first place a moment ago.
+-- the first per-life board this player tops, or nil. read before the credit: it can push the
+-- killer past the very record they ended, and asking after would find the killer on top and
+-- nobody who had been first a moment ago.
 local function PLS_toppedBoard(victim, boards)
     for _, def in ipairs(boards) do
-        -- topOf rather than the whole board sorted so that its first row can be read and the
-        -- rest thrown away.
+        -- topOf, not the whole board sorted so its first row can be read and the rest thrown
+        -- away.
         local name, score = PLS_Ranking.topOf(def.key)
-        -- registry order, so somebody holding both is announced once and for the same board
-        -- every time rather than whichever way a pairs() loop happened to fall.
+        -- registry order, so somebody holding both is announced for the same board every time
+        -- rather than whichever way a pairs() loop fell.
         if name == victim then return def, score end
     end
 
     return nil
 end
 
--- a run that would have placed in the top three has ended in a horde.
+-- a run that would have placed top three, ended by a horde.
 --
--- the question is asked of the run, not of the record behind it. a board like this ranks
--- somebody's best ever life, and a record holder dying on a fresh three-kill one has lost
--- nothing worth saying out loud -- while a run that places is exactly what it cost them.
+-- asked of the run, not the record behind it: a record holder dying on a fresh three-kill life
+-- has lost nothing worth saying, while a run that places is exactly what it cost them.
 local function PLS_announceFallen(victim, runs, now, boards)
     if not PLS_upsetReady(victim, now) then return end
 
@@ -307,8 +292,8 @@ local function PLS_announceFallen(victim, runs, now, boards)
         if run > 0 then
             local place = PLS_Ranking.placeOf(def.key, run)
 
-            -- the board it placed highest on. somebody caught mid-rampage reports whichever
-            -- of their runs was worth more, which is the honest answer to what they lost.
+            -- the board it placed highest on, so somebody caught mid-rampage reports whichever
+            -- run was worth more.
             if place <= ANNOUNCE_TOP and (not bestPlace or place < bestPlace) then
                 best, bestPlace, bestRun = def, place, run
             end
@@ -327,8 +312,8 @@ local function PLS_announceFallen(victim, runs, now, boards)
     })
 end
 
--- somebody took the top of a per-life board off the player who held it. called after the
--- credit, with the board that was captured before it.
+-- somebody took the top of a per-life board off its holder. called after the credit, with the
+-- board captured before it.
 local function PLS_announceSlain(victim, killer, board, score, now)
     if not board or not killer then return end
     if not PLS_upsetReady(victim, now) then return end
@@ -343,8 +328,8 @@ local function PLS_announceSlain(victim, killer, board, score, now)
     })
 end
 
--- a death ends every kind's run at once. gated on there being a per-life board to end one
--- for, so a server running account boards alone keeps no life state at all.
+-- a death ends every kind's run at once. gated on there being a per-life board, so a server
+-- running account boards alone keeps no life state.
 function PLS_Kills.endLife(username)
     if not username then return end
     if not PLS_Boards.anyLife() then return end
@@ -353,11 +338,10 @@ function PLS_Kills.endLife(username)
     PLS.trace("ended the life of " .. username)
 end
 
--- player is the victim, handed over by the engine, never read out of args.
+-- player is the victim, from the engine, never read out of args.
 --
--- both halves of a death go through here rather than through two command handlers, because
--- the cooldown below has to be spent once. two handlers reading it would mean whichever ran
--- first silently ate the other.
+-- both halves of a death come through here rather than two handlers, because the cooldown has
+-- to be spent once: two readers would mean whichever ran first silently ate the other.
 function PLS_Kills.onDeath(player, args)
     if not player then return end
 
@@ -368,30 +352,28 @@ function PLS_Kills.onDeath(player, args)
     if now - (lastDeath[victim] or 0) < DEATH_COOLDOWN_MS then return end
     lastDeath[victim] = now
 
-    -- once, and handed to each of the three below. this used to be three separate calls.
+    -- once, and handed to each of the three below.
     local boards = PLS_lifeBoards()
 
-    -- both read before anything below changes them: endLife wipes the runs, and crediting
-    -- the kill can move the top of a board.
+    -- both read before anything below changes them: endLife wipes the runs, and the credit can
+    -- move the top of a board.
     local runs = PLS_runsOf(victim, boards)
 
-    -- only the slain line reads this, and that line is unreachable with player kills off --
-    -- so asking on a server that does not track them is a board sorted for an answer nobody
-    -- ever looks at. still asked here rather than later, for the reason above: by the time
-    -- the ledger below has been spent, the credit has already moved the top of the board.
+    -- only the slain line reads this, and that line is unreachable with player kills off, so
+    -- asking would sort a board for an answer nobody looks at. still asked here rather than
+    -- later, for the reason above.
     local topped, toppedScore
     if PLS_Boards.tracked("pvp") then
         topped, toppedScore = PLS_toppedBoard(victim, boards)
     end
 
-    -- first, and whatever comes of the ledger below: the run is over however it ended, and
-    -- most deaths are not pvp at all. a client can send a death it did not have, and all
-    -- that buys is resetting its own run, whose record is already banked on the board.
+    -- first, whatever comes of the ledger: the run is over however it ended, and most deaths
+    -- are not pvp. a client can send a death it did not have, and all that buys is resetting
+    -- its own run, whose record is already banked.
     PLS_Kills.endLife(victim)
 
-    -- a horde landing the final blow on somebody a player had been working on will spend the
-    -- cooldown here and leave the slain line below unsaid. one death is worth one line, and
-    -- of the two this is the one that describes what actually killed them.
+    -- a horde landing the final blow spends the cooldown here and leaves the slain line
+    -- unsaid. one death is worth one line, and this is the one describing what killed them.
     if args and args.cause == "zombie" then
         PLS_announceFallen(victim, runs, now, boards)
     end
@@ -401,15 +383,14 @@ function PLS_Kills.onDeath(player, args)
     PLS_prune(now)
 
     local ledger = hits[victim]
-    -- nobody hit them inside the window, so this was a zombie, a fall, a fire or hunger.
+    -- nobody hit them inside the window: a zombie, a fall, a fire or hunger.
     if not ledger then return end
 
-    -- one death spends the whole ledger, whatever comes of it, so a body cannot be
-    -- cashed in twice.
+    -- one death spends the whole ledger, so a body cannot be cashed in twice.
     hits[victim] = nil
 
-    -- the victim's claim is a hint. it is honoured only where the ledger already agrees,
-    -- and otherwise the most recent attacker takes it.
+    -- the victim's claim is a hint, honoured only where the ledger agrees; otherwise the most
+    -- recent attacker takes it.
     local claimed = args and args.killer
     local killer = nil
 

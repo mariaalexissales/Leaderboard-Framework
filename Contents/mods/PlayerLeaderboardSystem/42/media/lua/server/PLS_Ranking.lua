@@ -11,10 +11,9 @@ if not PLS.isAuthority() then return end
 
 PLS_Ranking = PLS_Ranking or {}
 
--- a horde is a kill every second or so per player. without this the board would be
--- rebuilt and pushed to everyone on every one of them. it is kept even though the pump
--- now runs on EveryOneMinute rather than every tick, because that event runs on game time
--- and sprints while a player sleeps; the real clock is what holds the cadence steady.
+-- a horde is a kill a second per player, and every one would rebuild and push the board.
+-- EveryOneMinute runs on game time and sprints while a player sleeps, so the real clock holds
+-- the cadence, not the event.
 local RECOMPUTE_MS = 3000
 
 local lastRecompute = 0
@@ -39,20 +38,16 @@ end
 -- the view
 -- ----------------------------------------------------------------------------
 --
--- one board, sorted, with everything anybody asks of it worked out at the same time.
+-- one board, sorted, answering every question asked of it at once: the top rows, a player's
+-- rank, who is first, where a score would place. only the top rows need an ordering, and each
+-- used to re-sort the whole table for itself.
 --
--- four questions used to each rebuild and re-sort the whole table for themselves: the top ten,
--- one player's rank, who is first, and where a score would place. only the first of those needs
--- an ordering at all, and none of them needed a copy of their own -- on a full server that was a
--- sort per death, per join, and per push, plus a scan of every player for every player.
---
--- the sort is over an array of names rather than one of {name, score} rows, so a rebuild
--- allocates a handful of tables instead of one per ranked player. everything reads score[name].
+-- sorts names, not {name, score} rows, so a rebuild allocates a handful of tables rather than
+-- one per ranked player. everything else reads score[name].
 local cache = {}
 
 local function PLS_build(board)
-    -- read before the work, not after: the number this view is answered against has to be the
-    -- one that was current when it was built.
+    -- read before the work: the view must be stamped with the version it was built from.
     local at = PLS_State.version[board] or 0
 
     local data = PLS_State.ensure()
@@ -71,19 +66,18 @@ local function PLS_build(board)
     table.sort(names, function(a, b)
         local sa, sb = score[a], score[b]
         if sa ~= sb then return sa > sb end
-        -- ties broken by name so the order is fixed. two players sitting on the same
-        -- score must not be able to trade first place back and forth between sorts.
+        -- ties broken by name, so two players on the same score cannot trade places
+        -- between sorts.
         return a < b
     end)
 
-    -- rank by name, built once here rather than rediscovered by walking this list for every
-    -- online player on every push. that walk was the cost of a board update on a busy server:
-    -- one pass here replaces one pass per player.
+    -- built once here instead of rediscovered by walking this list for every online player
+    -- on every push, which was the cost of a board update on a busy server.
     local rankOf = {}
     for i = 1, #names do rankOf[names[i]] = i end
 
-    -- dense from 1 and short keys: this goes over the wire on every recompute, to everybody.
-    -- BoardSize is read here rather than passed in, so the two callers cannot disagree.
+    -- dense from 1, short keys: this goes over the wire to everybody. BoardSize is read here
+    -- so the two callers cannot disagree.
     local limit = tonumber(PLS.sandbox("BoardSize", 10)) or 10
     local rows = {}
     for i = 1, math.min(#names, limit) do
@@ -93,9 +87,8 @@ local function PLS_build(board)
     return { at = at, names = names, score = score, rankOf = rankOf, rows = rows, total = #names }
 end
 
--- rebuilt only when the board's standings have actually moved. PLS_State.markDirty counts those
--- moves, and the count keeps climbing after the dirty flag has been drained, which is what lets
--- a view built at any point still tell whether it has been overtaken.
+-- rebuilt only when the standings actually moved. markDirty's counter keeps climbing after the
+-- dirty flag is drained, which is what lets a view tell whether it has been overtaken.
 local function PLS_view(board)
     local view = cache[board]
     if view and view.at == (PLS_State.version[board] or 0) then return view end
@@ -106,8 +99,7 @@ local function PLS_view(board)
     return view
 end
 
--- who is first as the standings stand. PLS_State.leader is a different question -- it is the
--- record of who was last announced -- so this is topOf rather than leader.
+-- who is first right now. PLS_State.leader is a different question: who was last announced.
 function PLS_Ranking.topOf(board)
     local view = PLS_view(board)
 
@@ -117,22 +109,18 @@ function PLS_Ranking.topOf(board)
     return name, view.score[name]
 end
 
--- where a score of this size would sit on a board, without it having to be anybody's. one
--- past everyone strictly above it.
+-- where a score would place: one past everyone strictly above it.
 --
--- strictly is the whole of it. a player dying on the very run that set their record has an
--- entry on the board equal to that run, and must place at their own rank rather than one
--- below it -- which is also why "the run that just ended places top three" is a tighter
--- question than "this player is top three", and the one worth announcing.
+-- strictly matters. a player dying on the run that set their record sits on the board equal to
+-- it, and must place at their own rank rather than one below.
 function PLS_Ranking.placeOf(board, score)
     score = tonumber(score) or 0
 
     local view = PLS_view(board)
     local names, by = view.names, view.score
 
-    -- the list is in order already, so this is a search and not a count. lo settles on the
-    -- first entry not strictly above us, and that index is the place we take -- one past the
-    -- end when everybody is above, which is the right answer too.
+    -- already ordered, so this is a search not a count. lo settles on the first entry not
+    -- strictly above us; one past the end when everybody is, which is also right.
     local lo, hi = 1, #names + 1
 
     while lo < hi do
@@ -152,18 +140,17 @@ function PLS_Ranking.send(player, board, view)
         board = board,
         rows = view.rows,
         total = view.total,
-        -- the player's own standing rides along, so the footer strip is right even when
-        -- they are nowhere near the part of the board they can see. nil when they are not on
-        -- the board at all, exactly as the scan it replaces left it.
+        -- their own standing rides along, so the footer is right even when they are nowhere
+        -- near the visible part. nil when they are not on the board.
         rank = me and view.rankOf[me],
-        -- their real score, read past the view rather than out of it: somebody under
-        -- MinScoreToRank is not on the board but is still owed the number they have.
+        -- read past the view: someone under MinScoreToRank is off the board but still owed
+        -- the number they have.
         score = me and PLS_State.get(me, board) or 0,
     })
 end
 
--- announce only a genuine change of first place. a leader change is recorded either way,
--- so the next comparison is against what is actually on the board.
+-- announce only a genuine change of first place. the change is recorded either way, so the
+-- next comparison is against what is actually on the board.
 local function PLS_checkLeader(board, view)
     local topName = view.names[1]
     if not topName then return end
@@ -174,7 +161,7 @@ local function PLS_checkLeader(board, view)
     local now = getTimestampMs()
 
     if previous and previous.name == topName then
-        -- same player, higher score. keep the record current without saying anything.
+        -- same player, higher score. keep the record current, say nothing.
         PLS_State.setLeader(board, topName, topScore, previous.at)
         return
     end
@@ -182,8 +169,8 @@ local function PLS_checkLeader(board, view)
     local previousScore = previous and previous.score or 0
     local lastAt = previous and previous.at or 0
 
-    -- strictly ahead, not merely level. someone who climbs into a tie and wins the
-    -- alphabetical tie-break has not taken first place off anybody.
+    -- strictly ahead, not level: winning the alphabetical tie-break takes first place off
+    -- nobody.
     local announce = topScore > previousScore
         and PLS.sandbox("AnnounceFirstPlace", true) == true
 
@@ -200,14 +187,13 @@ local function PLS_checkLeader(board, view)
 end
 
 function PLS_Ranking.recompute(board)
-    -- cleared here rather than only in the pump, so a direct call from a command does not
-    -- leave a flag behind for the pump to redo three seconds later.
+    -- cleared here, not only in the pump, so a direct call from a command leaves no flag
+    -- behind for the pump to redo.
     PLS_State.dirty[board] = nil
 
     if not PLS_Boards.enabled(board) then return end
 
-    -- built once for everybody. the rows on the wire and every player's own rank come out of
-    -- the same view, so they cannot disagree and it cannot be sorted twice.
+    -- built once for everybody, so the wire rows and every player's rank cannot disagree.
     local view = PLS_view(board)
 
     PLS_checkLeader(board, view)
@@ -217,9 +203,8 @@ function PLS_Ranking.recompute(board)
     end)
 end
 
--- one player, every board. this is the handshake reply, and on a server that has been up a
--- while it is answered entirely out of the cache: nothing here has to sort anything.
--- ordered() has already dropped the boards that are switched off.
+-- the handshake reply. answered out of the cache, so nothing here sorts. ordered() has already
+-- dropped the boards that are switched off.
 function PLS_Ranking.sendAll(player)
     if not player then return end
 
@@ -229,8 +214,8 @@ function PLS_Ranking.sendAll(player)
 end
 
 local function PLS_pump()
-    -- table.isempty, not next(): kahlua's BaseLib does not register next at all, so
-    -- calling it is a call on a nil value. vanilla uses table.isempty for this.
+    -- table.isempty, not next(): kahlua's BaseLib does not register next at all, so calling
+    -- it is a call on a nil value.
     if table.isempty(PLS_State.dirty) then return end
 
     local now = getTimestampMs()
@@ -247,6 +232,6 @@ local function PLS_pump()
     end
 end
 
--- EveryOneMinute, not OnTick. this is about one call a second at default day length
--- instead of sixty. GameTime fires it, so it runs on a dedicated server.
+-- EveryOneMinute, not OnTick: about one call a second at default day length instead of sixty.
+-- GameTime fires it, so it runs on a dedicated server.
 PLS.guard("board pump", Events.EveryOneMinute, PLS_pump)

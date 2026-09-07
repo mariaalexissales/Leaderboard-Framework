@@ -8,8 +8,8 @@ require "PLS_Boards"
 
 PLS_Report = PLS_Report or {}
 
--- the server ledger only cares that a hit happened recently, not how many landed, so a
--- flurry of swings on one victim is worth exactly one packet.
+-- the ledger only cares that a hit happened recently, not how many landed, so a flurry of
+-- swings on one victim is worth one packet.
 local HIT_THROTTLE_MS = 2000
 local KILL_POLL_MS = 2000
 
@@ -21,8 +21,8 @@ local function PLS_onWeaponHitCharacter(wielder, character, weapon, damage)
     if not wielder or not character then return end
     if not instanceof(wielder, "IsoPlayer") or not instanceof(character, "IsoPlayer") then return end
 
-    -- a client sees other people's swings too, and reporting those would put hits in the
-    -- ledger that this machine has no business vouching for.
+    -- a client sees other people's swings too, and reporting those would put hits in the ledger
+    -- this machine has no business vouching for.
     local me = getPlayer()
     if not me or wielder ~= me then return end
 
@@ -37,20 +37,19 @@ local function PLS_onWeaponHitCharacter(wielder, character, weapon, damage)
     PLS_Net.toServer("hit", { victim = victim })
 end
 
--- a death is worth reporting for two unrelated reasons, so it asks about both. the per-life
--- boards are the ones that matter here: pvp tracking is off in the shipped settings, and
--- gating this on it alone left the running counts with nothing to reset them.
+-- reported for two unrelated reasons, so it asks about both. the per-life boards matter here:
+-- pvp is off in shipped settings, and gating on it alone left the running counts with nothing
+-- to reset them.
 local function PLS_onPlayerDeath(player)
     if not PLS_Boards.tracked("pvp") and not PLS_Boards.anyLife() then return end
     if not player or not player:isLocalPlayer() then return end
 
-    -- sent even when this comes back nil: the server still has its ledger, and a death
-    -- with no claim attached is the honest shape of being shot from off screen.
+    -- sent even when nil: the server still has its ledger, and a death with no claim is the
+    -- honest shape of being shot from off screen.
     --
-    -- the cause rides along off the same call. it is what the server needs to tell a run
-    -- that ended in a horde from one that ended in a fall, and it is this client's word for
-    -- it like everything else on this path -- a modified one could claim a horde it never
-    -- met, and buy itself a single chat line about its own death, throttled at the far end.
+    -- the cause rides along, telling a run that ended in a horde from one that ended in a fall.
+    -- this client's word, like everything on this path: a modified one could claim a horde it
+    -- never met and buy one chat line about its own death, throttled at the far end.
     local killer = nil
     local cause = nil
     local attacker = player:getAttackedBy()
@@ -65,7 +64,7 @@ local function PLS_onPlayerDeath(player)
     PLS_Net.toServer("death", { killer = killer, cause = cause })
 end
 
--- the fallback for servers that hand back a nil attacker on OnZombieDead. off unless
+-- fallback for servers handing back a nil attacker on OnZombieDead. off unless
 -- PLS.Config.clientKillReporting is set, and the server clamps whatever arrives.
 local lastPoll = 0
 local lastKills = nil
@@ -76,16 +75,16 @@ local function PLS_pollZombieKills()
     local player = getPlayer()
     if not player then return end
 
-    -- EveryOneMinute runs on game time, which sprints when the player sleeps, so the real
-    -- clock is what actually paces this.
+    -- EveryOneMinute runs on game time and sprints while the player sleeps, so the real clock
+    -- paces this.
     local now = getTimestampMs()
     if now - lastPoll < KILL_POLL_MS then return end
     lastPoll = now
 
     local total = player:getZombieKills() or 0
 
-    -- nil on the first pass, and lower than last time after a death started a new
-    -- character. both just reset the baseline rather than reporting anything.
+    -- nil on the first pass, and lower after a death started a new character. both reset the
+    -- baseline rather than reporting anything.
     if lastKills == nil or total < lastKills then
         lastKills = total
         return
@@ -100,8 +99,8 @@ local function PLS_pollZombieKills()
 end
 
 -- the two that repeat go behind the guard: a swing connects several times a second in a
--- horde, and the poll is on a timer. a death is a one-off and is left alone, so a fault
--- there still surfaces the ordinary way.
+-- horde, and the poll is on a timer. a death is a one-off, so a fault there still surfaces
+-- the ordinary way.
 PLS.guard("pvp hit report", Events.OnWeaponHitCharacter, PLS_onWeaponHitCharacter)
 PLS.guard("zombie kill poll", Events.EveryOneMinute, PLS_pollZombieKills)
 Events.OnPlayerDeath.Add(PLS_onPlayerDeath)

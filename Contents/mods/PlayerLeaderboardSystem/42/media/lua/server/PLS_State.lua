@@ -16,14 +16,13 @@ PLS_State.data = PLS_State.data or nil
 -- boards whose standings have moved since the last recompute. PLS_Ranking drains this.
 PLS_State.dirty = PLS_State.dirty or {}
 
--- how many times each board's standings have moved, ever, this session. PLS_Ranking caches a
--- sorted view per board and compares the number it built against against this one, so the
--- counter has to keep climbing after dirty has been drained -- which is exactly why it is a
--- second thing and not a reuse of the flag above. runtime only: a restart rebuilds every view.
+-- how many times each board has moved this session. separate from the flag above because it
+-- must keep climbing after dirty is drained -- that is what lets PLS_Ranking's cached view
+-- tell whether it has been overtaken. runtime only: a restart rebuilds every view.
 PLS_State.version = PLS_State.version or {}
 
--- keyed by username in global mod data, never player:getModData(). a client's own mod data
--- is that client's copy and is never pushed up, so it cannot be trusted with a score.
+-- global mod data, never player:getModData(): a client's own mod data is its copy and is never
+-- pushed up, so it cannot be trusted with a score.
 function PLS_State.ensure()
     if not PLS_State.data then
         PLS_State.data = ModData.getOrCreate(TABLE_NAME)
@@ -32,13 +31,11 @@ function PLS_State.ensure()
     local data = PLS_State.data
     data.v = data.v or PLS.SCHEMA_V
     data.players = data.players or {}
-    -- who held first place at the last announcement, so a restart does not re-announce
-    -- whoever was already sitting on top.
+    -- who held first at the last announcement, so a restart does not re-announce them.
     data.leaders = data.leaders or {}
-    -- kills on the life a player is on right now, keyed by kind rather than by board. a run
-    -- feeds the best-life board but is not itself a score, and keeping it out of data.players
-    -- keeps that table the flat board -> number map the ranking loop expects. persisted on
-    -- purpose: a restart must not hand everybody a fresh run.
+    -- the run each player is on, keyed by kind not board: a run feeds the best-life board but
+    -- is not itself a score, and keeping it out of players leaves that a flat board -> number
+    -- map. persisted on purpose -- a restart must not hand everybody a fresh run.
     --   username -> { zombie = n, pvp = n, h = hours survived when last seen }
     data.lives = data.lives or {}
 
@@ -59,9 +56,8 @@ function PLS_State.scores(username)
     return entry
 end
 
--- reads without creating, unlike scores(). every board push looks up the standing of
--- every online player, and going through scores() would leave an empty table in the save
--- for everyone who has ever connected without scoring.
+-- reads without creating, unlike scores(). every push looks up every online player, and
+-- scores() would leave an empty table in the save for everyone who ever connected.
 function PLS_State.get(username, board)
     if not username or not board then return 0 end
 
@@ -85,8 +81,7 @@ function PLS_State.add(username, board, amount)
     local entry = PLS_State.scores(username)
     local total = (entry[board] or 0) + amount
 
-    -- a board is a race to the top; nothing here has any business going backwards past
-    -- zero, and a negative would sort above everybody on the wrong comparison.
+    -- clamped: a negative would sort above everybody on the wrong comparison.
     if total < 0 then total = 0 end
 
     entry[board] = total
@@ -95,8 +90,8 @@ function PLS_State.add(username, board, amount)
     return total
 end
 
--- an absolute write, where add() is a delta. a best-life board is a high-water mark rather
--- than a running total, so the only thing that can set it is the run that passed it.
+-- absolute, where add() is a delta. a best-life board is a high-water mark, so only the run
+-- that passed it can set it.
 function PLS_State.set(username, board, value)
     if not username or not board then return 0 end
 
@@ -142,12 +137,11 @@ function PLS_State.lifeAdd(username, kind, amount)
     return total
 end
 
--- every kind at once, because a death ends the whole life and not one board's part of it.
--- the hours mark is carried over: it says which character this is, not what they scored.
+-- every kind at once: a death ends the whole life, not one board's part of it. the hours mark
+-- carries over -- it says which character this is, not what they scored.
 --
--- replaced rather than emptied key by key while iterating it. kahlua is not a lua this mod
--- gets to assume the standard's traversal rules from -- PLS_Ranking says the same about
--- next() -- and the table is three numbers wide.
+-- replaced rather than emptied key by key while iterating: kahlua's traversal rules are not
+-- the standard's (see next() in PLS_Ranking), and the table is three numbers wide.
 function PLS_State.lifeClear(username)
     if not username then return end
 
@@ -158,8 +152,8 @@ function PLS_State.lifeClear(username)
     data.lives[username] = { h = run.h }
 end
 
--- the hours survived this account was last seen on. a lower one next time means a different
--- character, which is a death nobody reported.
+-- hours survived when last seen. a lower one next time means a different character, which is
+-- a death nobody reported.
 function PLS_State.lifeHours(username)
     if not username then return nil end
 
@@ -181,8 +175,7 @@ function PLS_State.setLifeHours(username, hours)
     run.h = tonumber(hours) or 0
 end
 
--- wipes one board without touching the others, so an admin can start a new zombie season
--- and leave the pvp standings alone.
+-- one board only, so an admin can start a new zombie season and leave pvp alone.
 function PLS_State.resetBoard(board)
     if not board then return end
 
@@ -192,9 +185,8 @@ function PLS_State.resetBoard(board)
         entry[board] = nil
     end
 
-    -- a per-life board is a record of runs, and the run that set one may still be going. wiping
-    -- the records without wiping those would put everybody back on the board at their old score
-    -- with their very next kill.
+    -- the run that set a per-life record may still be going. wiping records without wiping
+    -- runs would put everybody back at their old score on their next kill.
     local def = PLS_Boards.get(board)
     if def and def.scope == "life" then
         for _, run in pairs(data.lives) do
@@ -217,8 +209,8 @@ function PLS_State.setLeader(board, name, score, announcedAt)
     PLS_State.ensure().leaders[board] = {
         name = name,
         score = score,
-        -- real milliseconds, so the announce cooldown still throttles while the world is
-        -- running fast or a player is asleep.
+        -- real milliseconds, so the cooldown still throttles while the world runs fast or a
+        -- player sleeps.
         at = announcedAt,
     }
 end

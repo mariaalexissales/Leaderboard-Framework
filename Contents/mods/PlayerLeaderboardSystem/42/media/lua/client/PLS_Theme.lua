@@ -4,8 +4,8 @@
 
 PLS_Theme = PLS_Theme or {}
 
--- NeatUI's end caps take a tint and the body does not, so state is carried by tinting
--- the caps and filling the body behind them.
+-- NeatUI's end caps take a tint and the body does not, so state is carried by tinting the caps
+-- and filling the body behind them.
 PLS_Theme.STATES = {
     disabled = { cap = { 0.45, 0.45, 0.45 }, alpha = 0.45, fill = nil,
                  text = { 0.42, 0.42, 0.42 } },
@@ -26,8 +26,8 @@ PLS_Theme.COL_TITLE = { r = 0.90, g = 0.91, b = 0.90 }
 PLS_Theme.COL_DIM = { r = 0.50, g = 0.50, b = 0.50 }
 PLS_Theme.COL_SCORE = { r = 0.80, g = 0.74, b = 0.50 }
 
--- the top three read at a glance from the accent bar alone, which is the only thing
--- separating a leaderboard from a list of names.
+-- the top three read at a glance from the accent bar alone, which is what separates a
+-- leaderboard from a list of names.
 PLS_Theme.COL_FIRST = { r = 0.98, g = 0.82, b = 0.45 }
 PLS_Theme.COL_SECOND = { r = 0.78, g = 0.80, b = 0.84 }
 PLS_Theme.COL_THIRD = { r = 0.80, g = 0.58, b = 0.38 }
@@ -35,9 +35,8 @@ PLS_Theme.COL_REST = { r = 0.38, g = 0.38, b = 0.38 }
 
 PLS_Theme.COL_ME = { r = 0.55, g = 0.80, b = 0.95 }
 
--- drawRect and drawRectBorder both take alpha first and the channels after, which is the
--- opposite order to the tables above. spelling that out at the call site is four chances
--- to get it wrong and no complaint when you do.
+-- drawRect and drawRectBorder take alpha first, channels after -- the opposite order to the
+-- tables above. spelling that out at each call site is four chances to get it wrong silently.
 function PLS_Theme.fill(ui, x, y, w, h, colour)
     ui:drawRect(x, y, w, h, colour.a, colour.r, colour.g, colour.b)
 end

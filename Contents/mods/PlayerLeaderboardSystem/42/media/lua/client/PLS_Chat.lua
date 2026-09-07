@@ -10,27 +10,25 @@ PLS_Chat = PLS_Chat or {}
 -- gold, so an announcement reads as one against the ordinary chat traffic around it.
 local COL_ANNOUNCE = "<RGB:0.98,0.82,0.45>"
 
--- a notice is the game answering something the player just did, not news about somebody
--- else, so it sits back in the grey rather than competing with an announcement.
+-- the game answering what the player just did, not news about somebody else, so it sits
+-- back in the grey rather than competing with an announcement.
 local COL_NOTICE = "<RGB:0.66,0.66,0.66>"
 
--- somebody lost something. the same weight as an announcement, because it is news of the
--- same size, but it must not read gold like a triumph.
+-- somebody lost something: an announcement's weight, since it is news of the same size,
+-- but it must not read gold like a triumph.
 local COL_UPSET = "<RGB:0.90,0.45,0.42>"
 
--- chat is somebody else's window and its tabs come from the server on their own packet, well
--- after OnGameStart. until the first one lands ISChat.instance.chatText is nil, and a board
--- announcement broadcast while somebody is still loading in used to land in that hole. vanilla
--- never hits it because ChatBase.showMessage holds OnAddMessage back until a tab exists;
--- nothing gates a line we write ourselves, so this checks for itself.
+-- chat tabs arrive from the server well after OnGameStart, and until the first lands
+-- ISChat.instance.chatText is nil. vanilla never hits it: ChatBase.showMessage holds
+-- OnAddMessage back until a tab exists. nothing gates a line we write, so this checks itself.
 local function PLS_chatPanel()
     -- singleplayer has no chat window at all: ISChat.createChat returns early on not isClient.
     if not isClient() then return nil end
     if not ISChat or not ISChat.instance then return nil end
 
-    -- checked rather than assumed, and never falling back to defaultTab: onSetDefaultTab is the
-    -- only thing that sets that and nils it in this same window, so it is no better here, and
-    -- assigning chatText without vanilla's paired onActivateView leaves the window half built.
+    -- never falls back to defaultTab: onSetDefaultTab is the only thing that sets it and nils
+    -- it in this same window. assigning chatText without vanilla's paired onActivateView leaves
+    -- the window half built.
     local panel = ISChat.instance.chatText
     if type(panel) ~= "table" then return nil end
     if type(panel.chatTextLines) ~= "table" then return nil end
@@ -38,15 +36,15 @@ local function PLS_chatPanel()
     return panel
 end
 
--- a joining client is told about a leader change before its chat exists, and losing that is
--- worse than showing it a moment late. bounded, because this is news rather than a log and a
--- client that never gets a window must not grow a list for the rest of the session.
+-- a joining client hears about a leader change before its chat exists, and losing that
+-- beats showing it late. bounded: news, not a log, and a client that never gets a window
+-- must not grow a list all session.
 local PENDING_MAX = 8
 local pending = {}
 
--- vanilla's ISChat.addLineInChat wants a java ChatMessage, which lua has no way to build, so
--- the line goes straight into the tab's own backing table the way every other mod that prints
--- to chat does it. this is that function's own body, less the parts that need the message.
+-- ISChat.addLineInChat wants a java ChatMessage, which lua cannot build, so the line goes
+-- straight into the tab's backing table like every other mod that prints to chat. this is
+-- that function's body, less the parts needing the message.
 local function PLS_paint(panel, text)
     local lines = panel.chatTextLines
 
@@ -71,8 +69,8 @@ local function PLS_paint(panel, text)
     panel.text = rebuilt
     panel:paginate()
 
-    -- only follow the new line down if they were already reading the bottom. yanking the
-    -- scroll out from under someone reading back is worse than a missed line.
+    -- only follow down if they were already at the bottom: yanking the scroll from someone
+    -- reading back is worse than a missed line.
     if scrolledToBottom then panel:setYScroll(-10000) end
 end
 
@@ -80,14 +78,14 @@ local function PLS_write(text)
     local panel = PLS_chatPanel()
     if not panel then return false end
 
-    -- the panel is real, so the line is spoken for either way. a fault inside vanilla's own
-    -- rich text panel is not a reason to put it back on the queue and try it forever.
+    -- the panel is real, so the line is spoken for either way. a fault inside vanilla's rich
+    -- text panel is no reason to requeue it forever.
     pcall(PLS_paint, panel, text)
     return true
 end
 
--- Say draws the string as it stands, so the colour markup chat understands would be read out as
--- literal text. the parentheses keep gsub's second return value out of Say's own second argument.
+-- Say draws the string as-is, so chat's colour markup would read out as literal text. the
+-- parentheses keep gsub's second return out of Say's second argument.
 local function PLS_say(text)
     local player = getPlayer()
     if not player then return end
@@ -98,8 +96,8 @@ end
 function PLS_Chat.line(text)
     if PLS_write(text) then return end
 
-    -- nothing to write to. in singleplayer there never will be, so say it out loud instead; on
-    -- a client it is the tabs not having arrived yet, which the flush below is waiting for.
+    -- nothing to write to. singleplayer never will have, so say it out loud; on a client the
+    -- tabs have not arrived yet, which the flush below waits for.
     if not isClient() then
         PLS_say(text)
         return
@@ -109,9 +107,9 @@ function PLS_Chat.line(text)
     pending[#pending + 1] = text
 end
 
--- ISChat wires its own OnTabAdded inside createChat, which runs on OnGameStart, later than this
--- file loads. a handler registered here would therefore run before the one that assigns
--- chatText and would still find nothing. the tick is a little late but always right.
+-- ISChat wires its OnTabAdded inside createChat on OnGameStart, later than this file loads,
+-- so a handler registered here would run before chatText is assigned and still find nothing.
+-- the tick is a little late but always right.
 local function PLS_flush()
     if #pending == 0 then return end
     if not PLS_chatPanel() then return end
@@ -125,16 +123,16 @@ end
 
 PLS.guard("chat flush", Events.EveryOneMinute, PLS_flush)
 
--- the announce name, not the tab label: a tab reads "Per Life" because the other half of the
--- row says which kills, and a line in chat stands on its own. an unregistered board still has
--- a key, and printing that beats printing nothing.
+-- the announce name, not the tab label: a tab reads "Per Life" only because the other half
+-- of the row says which kills, and a chat line stands alone. an unregistered board still has
+-- a key, and printing that beats nothing.
 local function PLS_boardTitle(board)
     local def = PLS_Boards.get(board)
     return def and getText(def.announce or def.title) or board
 end
 
 -- only ever a top three, so three strings rather than a suffix rule: english ordinals do
--- not survive translation as one, and the fourth place this cannot render never arrives.
+-- not survive translation, and the fourth place this cannot render never arrives.
 local ORDINALS = { "IGUI_PLS_Ordinal1st", "IGUI_PLS_Ordinal2nd", "IGUI_PLS_Ordinal3rd" }
 
 local function PLS_ordinal(place)
@@ -151,8 +149,7 @@ local function PLS_halo(name, text)
     pcall(function() HaloTextHelper.addGoodText(player, text) end)
 end
 
--- three kinds now, and an announcement that arrives without one is the leader change this
--- only ever used to carry.
+-- three kinds now. one arriving without a kind is the leader change this used to only carry.
 function PLS_Chat.announce(args)
     if not args or not args.name or not args.board then return end
 
@@ -180,11 +177,11 @@ function PLS_Chat.announce(args)
     PLS_halo(args.name, getText("IGUI_PLS_AnnounceHalo", title))
 end
 
--- the answer to /pls, straight from the server's own copy of the table. grey like a notice,
--- because it is the game answering something this player just typed rather than news.
+-- the answer to /pls, from the server's own copy. grey like a notice: the game answering
+-- what this player typed, not news.
 --
--- untranslated on purpose: these lines get pasted into bug reports, and a stable string is
--- worth more there than a localised one.
+-- untranslated on purpose -- these get pasted into bug reports, where a stable string beats
+-- a localised one.
 function PLS_Chat.dump(args)
     if not args or type(args.lines) ~= "table" then return end
 
@@ -193,8 +190,8 @@ function PLS_Chat.dump(args)
     end
 end
 
--- the server's acknowledgement of something an admin asked for. only reset today, but the
--- kind is on the wire so a second one does not need a second command.
+-- the server acknowledging an admin action. only reset today, but the kind is on the wire
+-- so a second one needs no second command.
 function PLS_Chat.toast(args)
     if not args or args.kind ~= "reset" or not args.board then return end
 

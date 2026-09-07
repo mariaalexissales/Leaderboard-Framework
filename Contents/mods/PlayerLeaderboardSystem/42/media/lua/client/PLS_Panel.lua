@@ -37,8 +37,8 @@ function PLS_Panel:new(x, y, width, height, player)
     o.player = player
     o.playerNum = player:getPlayerNum()
     o.title = getText("IGUI_PLS_Title")
-    -- the two halves of the tab row are a coordinate; tab is the board key they land on,
-    -- and everything downstream of the panel still knows only about that.
+    -- the two halves of the tab row are a coordinate; tab is the board key they land on, and
+    -- everything downstream knows only about that.
     o.group = nil
     o.scope = nil
     o.tab = nil
@@ -47,17 +47,17 @@ function PLS_Panel:new(x, y, width, height, player)
     -- a peek closes on key release; a tap pins the window until the next tap.
     o.pinned = true
     o.resizable = true
-    -- both label pairs share one row, and the strip has no overflow handling, so the stop
-    -- has to come before the left half and the right half meet in the middle.
+    -- both label pairs share one row and the strip has no overflow handling, so the stop comes
+    -- before the two halves meet in the middle.
     o.minimumWidth = 420
     o.minimumHeight = 300
 
     return o
 end
 
--- one place for the vertical bands so createChildren and onResize cannot drift. a
--- resizable ISCollapsableWindow paints a status bar over its own bottom edge and lays a
--- resize widget across it that swallows clicks, so the footer sits above that.
+-- one place for the vertical bands so createChildren and onResize cannot drift. a resizable
+-- ISCollapsableWindow paints a status bar over its bottom edge with a resize widget that
+-- swallows clicks, so the footer sits above that.
 function PLS_Panel:bands()
     local tabY = self:titleBarHeight() + PAD
     local listY = tabY + TAB_HEIGHT + GAP
@@ -65,8 +65,8 @@ function PLS_Panel:bands()
     return tabY, listY, footerY
 end
 
--- the well is drawn to the band, and the scroll view sits one pixel inside it so the
--- frame is not painted over. createChildren and onResize both need that same inset.
+-- the well is drawn to the band and the scroll view sits one pixel inside it, so the frame
+-- is not painted over. createChildren and onResize both need that inset.
 function PLS_Panel:listBounds()
     local _, listY, footerY = self:bands()
     return PAD + 1, listY + 1, self.width - PAD * 2 - 2, footerY - listY - GAP - 2
@@ -100,14 +100,12 @@ function PLS_Panel:createChildren()
         self.tabs[#self.tabs + 1] = button
         x = button:getRight() + 4
 
-        -- the scope pair sits on the same row, hard against the right edge. every group's is
-        -- built now and hidden until its group is picked, rather than torn down and rebuilt on
-        -- each press. a group holding one board gets no scope button at all, which is what a
-        -- board registered without a group has always been.
+        -- the scope pair sits on the same row, hard right. every group's is built now and hidden
+        -- until its group is picked, rather than rebuilt on each press. a group of one board gets no
+        -- scope button, which is what a board registered without a group has always been.
         --
-        -- laid out backwards from the right so the last one placed is the leftmost, which
-        -- leaves them reading in registry order on screen. anchored rather than repositioned
-        -- in onResize, the way the footer buttons already are.
+        -- laid out backwards from the right so the last placed is leftmost, leaving them in registry
+        -- order on screen. anchored rather than repositioned in onResize, like the footer buttons.
         local scopes = PLS_Boards.scopes(group.key)
         if #scopes > 1 then
             local scopeX = self.width - PAD
@@ -136,8 +134,8 @@ function PLS_Panel:createChildren()
     self.list = NIVirtualScrollView:new(listX, listTop, listWidth, listHeight)
     self.list:initialise()
     self.list:instantiate()
-    -- setOnCreateItem after instantiate: createChildren already ran initializePool once
-    -- with no callback set and quietly did nothing.
+    -- setOnCreateItem after instantiate: createChildren already ran initializePool once with no
+    -- callback set and quietly did nothing.
     self.list:setOnCreateItem(function()
         local row = PLS_Row:new(0, 0, self.list:getWidth(), PLS_Row.HEIGHT, self)
         -- the pool calls initialise for us but not instantiate.
@@ -152,8 +150,8 @@ function PLS_Panel:createChildren()
     self.listHeight = listHeight
     self:addChild(self.list)
 
-    -- refreshBtn, not refresh: PLS_Panel:refresh is a method, and a field of that name on
-    -- the instance would shadow it and turn self:refresh() into a call on a button.
+    -- refreshBtn, not refresh: PLS_Panel:refresh is a method, and a field of that name would
+    -- shadow it and turn self:refresh() into a call on a button.
     self.refreshBtn = PLS_Button:new(self.width - PAD - 90, footerY + 1, 90, FOOTER_HEIGHT - 4,
         getText("IGUI_PLS_Refresh"), self, PLS_Panel.onRefresh)
     self:attach(self.refreshBtn, { anchorLeft = false, anchorRight = true })
@@ -166,9 +164,9 @@ function PLS_Panel:createChildren()
     self:refresh()
 end
 
--- a group and a scope resolved down to the one board key the rest of the panel reads. the
--- scope is carried across a group change wherever the new group offers it: paging between
--- zombies and players while staying on per life is the move this is for.
+-- group and scope resolved to the one board key the rest of the panel reads. the scope
+-- carries across a group change where the new group offers it: paging between zombies and
+-- players while staying on per life is the move this is for.
 function PLS_Panel:select(group, scope)
     self.group, self.scope, self.tab = nil, nil, nil
     if not group then return end
@@ -210,7 +208,7 @@ function PLS_Panel:onReset()
     if not self.tab then return end
 
     -- nothing under a modal stops being clickable, so a second press would stack a second
-    -- prompt on the first. vanilla guards its sleep dialog the same way.
+    -- prompt. vanilla guards its sleep dialog the same way.
     if self.resetModal then return end
 
     local modal = ISModalDialog:new(
@@ -225,8 +223,8 @@ function PLS_Panel:onReset()
     self.resetModal = modal
 end
 
--- the board travels with the modal, so a tab that changes while it is open cannot wipe a
--- different board than the one that was asked about.
+-- the board travels with the modal, so a tab changing while it is open cannot wipe a
+-- different board than the one asked about.
 function PLS_Panel:onConfirmReset(button, board)
     self.resetModal = nil
 
@@ -251,8 +249,8 @@ end
 function PLS_Panel:refresh()
     self.rows = self:buildRows()
 
-    -- the scroll view only reassigns data when the visible range moves, so a refresh that
-    -- leaves the row count alone has to be forced through.
+    -- the scroll view only reassigns data when the visible range moves, so a refresh leaving the
+    -- row count alone has to be forced through.
     if self.list then self.list:setDataSource(self.rows, true) end
 end
 
@@ -304,8 +302,8 @@ function PLS_Panel:render()
 
     PLS_Theme.fill(self, PAD, footerY - GAP / 2, self.width - PAD * 2, 1, PLS_Theme.COL_FRAME)
 
-    -- the player's own standing, sent alongside the board, so it is right even when they
-    -- are nowhere near the part of it they can see.
+    -- their own standing, sent alongside the board, so it is right even when they are nowhere
+    -- near the part they can see.
     local board = PLS_ClientState.board(self.tab)
     local textY = footerY + math.floor((FOOTER_HEIGHT - getTextManager():getFontHeight(font)) / 2)
 
@@ -325,9 +323,9 @@ function PLS_Panel:render()
         PLS_Theme.COL_SCORE.r, PLS_Theme.COL_SCORE.g, PLS_Theme.COL_SCORE.b, 1, font)
 end
 
--- rows only ever change when the server pushes a board, and the cache bumps a revision
--- on every one of those, so there is nothing for a tick floor to catch. the footer reads
--- the cache directly in render and is live regardless.
+-- rows only change when the server pushes a board, and the cache bumps a revision on each,
+-- so there is nothing for a tick floor to catch. the footer reads the cache in render and is
+-- live regardless.
 function PLS_Panel:update()
     ISCollapsableWindow.update(self)
 
@@ -347,8 +345,8 @@ function PLS_Panel:onResize()
     self.list:setWidth(listWidth)
     self.list:setHeight(listHeight)
 
-    -- setConfig rebuilds the whole widget pool and onResize fires every frame of a drag,
-    -- so only reconfigure when the height actually moved.
+    -- setConfig rebuilds the whole widget pool and onResize fires every frame of a drag, so only
+    -- reconfigure when the height actually moved.
     if self.listHeight ~= listHeight then
         self.listHeight = listHeight
         self.list:setConfig(PLS_Row.HEIGHT, 2)
@@ -377,22 +375,22 @@ function PLS_Panel:close()
     self:removeFromUIManager()
 end
 
--- pinned is what the keybind reads to decide whether a key release should close the
--- window: a tap pins it, a hold does not.
+-- what the keybind reads to decide whether a key release closes the window: a tap pins it,
+-- a hold does not.
 function PLS.openPanel(player, pinned)
     if not player then return end
 
     local playerNum = player:getPlayerNum()
     if playerNum ~= 0 then return end
 
-    -- a join that missed the handshake would otherwise sit on "waiting" until somebody else
-    -- scores, so looking at the panel is itself a reason to ask again -- every time, not only
-    -- before the first reply ever, or the panel never shows anything newer than what arrived
-    -- once. the pacing is in requestOnOpen, because the keybind opens this on every peek.
+    -- a join that missed the handshake would sit on "waiting" until somebody else scores, so
+    -- opening the panel is itself a reason to ask again -- every time, or it never shows anything
+    -- newer than what arrived once. pacing is in requestOnOpen, since the keybind opens this on
+    -- every peek.
     PLS_ClientState.requestOnOpen()
 
-    -- NeatUI is declared in mod.info, but a client that has somehow loaded us without it
-    -- would otherwise index a nil and take the whole ui down with it.
+    -- NeatUI is declared in mod.info, but a client that somehow loaded us without it would
+    -- index a nil and take the whole ui down.
     if not NIVirtualScrollView then
         PLS.warn("NeatUI Framework is not loaded, so the leaderboard cannot open")
         return

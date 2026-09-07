@@ -6,8 +6,8 @@ require "PLS_Panel"
 
 local BIND = "Toggle Leaderboard"
 
--- vanilla's Q radial splits a tap from a hold at the same figure. matching it means the
--- two do not ask for different timing from the same finger.
+-- vanilla's Q radial splits tap from hold at the same figure, so the two do not ask for
+-- different timing from the same finger.
 local HOLD_MS = 250
 
 keyBinding = keyBinding or {}
@@ -24,7 +24,7 @@ local function PLS_boundKey()
 end
 
 -- a bound key still reaches this handler while chat has focus, so without it somebody
--- typing into a message would have the panel opening underneath them.
+-- typing would have the panel open underneath them.
 local function PLS_blocked()
     if ISChat and ISChat.focused then return true end
     return false
@@ -39,12 +39,11 @@ local function PLS_onKeyStartPressed(key)
 
     pressedMS = getTimestampMs()
 
-    -- already open, so this press belongs to the release: it either taps the window shut
-    -- or holds it where it is. opening it again here would only reset the pin.
+    -- already open, so this press belongs to the release: it taps the window shut or holds
+    -- it. opening again here would only reset the pin.
     if PLS.isWindowOpen(0) then return end
 
-    -- unpinned, because we do not know yet whether this is a tap or a hold. the release
-    -- decides, and until then it is a peek.
+    -- unpinned: tap or hold is not known yet. the release decides, and until then a peek.
     PLS.openPanel(player, false)
 end
 
@@ -69,8 +68,8 @@ local function PLS_onKeyReleased(key)
         return
     end
 
-    -- a hold, which was only ever a peek. a window that was already pinned before the key
-    -- went down stays where it is; holding the key over it should not shut it.
+    -- a hold, which was only ever a peek. a window already pinned before the key went down
+    -- stays: holding the key over it should not shut it.
     if not window.pinned then window:close() end
 end
 

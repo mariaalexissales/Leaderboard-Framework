@@ -16,8 +16,8 @@ local function PLS_clientHandler()
     return PLS_ClientState and PLS_ClientState.onCommand
 end
 
--- the no-remote-server tail of both toClient and toAll, which is the same either way:
--- with nobody to send to, one client and every client are the same client.
+-- the no-remote-server tail of both toClient and toAll: with nobody to send to, one client and
+-- every client are the same client.
 local function PLS_dispatchLocal(command, args)
     local handler = PLS_clientHandler()
     if not handler then return end
@@ -26,15 +26,14 @@ local function PLS_dispatchLocal(command, args)
     if not ok then PLS.warn("client handler " .. tostring(command) .. " failed: " .. tostring(err)) end
 end
 
--- with no remote server the send is a direct call into the handler that would have
--- received it, so singleplayer runs the same scoring, ranking and broadcast code the
--- server does.
+-- with no remote server the send is a direct call into the handler that would have received
+-- it, so singleplayer runs the same scoring, ranking and broadcast code the server does.
 function PLS_Net.toServer(command, args)
     args = args or {}
 
     if PLS.hasRemoteServer() then
-        -- nil this early on a multiplayer client, and handing nil to sendClientCommand
-        -- loses the packet without a word. say so, and let the caller retry.
+        -- nil this early on a multiplayer client, and handing nil to sendClientCommand loses
+        -- the packet without a word. say so, and let the caller retry.
         local player = getPlayer()
         if not player then
             PLS.warn("no local player yet, dropped " .. tostring(command))

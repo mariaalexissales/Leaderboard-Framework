@@ -20,8 +20,8 @@ local function PLS_textureWidth()
     return 48
 end
 
--- the sidebar is rebuilt whole when the size option changes and the old panel is still
--- alive for a frame or two. touching a stale one wrecks the live panel's geometry.
+-- the sidebar is rebuilt whole when the size option changes, and the old panel lives on for
+-- a frame or two. touching a stale one wrecks the live panel's geometry.
 local function PLS_isCurrentPanel(panel)
     if not panel or not panel.playerNum then return false end
 
@@ -33,23 +33,22 @@ local function PLS_isCurrentPanel(panel)
     return true
 end
 
--- every button the sidebar can build. half of them are conditional, and adminBtn and
--- warManagerBtn are built for every mp player but hidden for most of them.
+-- every button the sidebar can build. half are conditional, and adminBtn and warManagerBtn
+-- are built for every mp player but hidden for most.
 local BUTTONS = {
     "invBtn", "healthBtn", "craftingBtn", "buildBtn", "movableBtn", "searchBtn",
     "zoneBtn", "mapBtn", "debugBtn", "arfBtn", "safetyBtn", "clientBtn",
     "adminBtn", "warManagerBtn",
 }
 
--- vanilla's own UI_BORDER_SPACING + 5 rhythm. it is local to ISEquippedItem, same as
--- TEXTURE_WIDTH, so the number has to be written out again here.
+-- vanilla's UI_BORDER_SPACING + 5 rhythm, local to ISEquippedItem like TEXTURE_WIDTH, so the
+-- number is written out again here.
 local COLUMN_GAP = 15
 
--- the lowest button actually on screen. it has to be worked out every frame rather than
--- once: ISEquippedItem toggles adminBtn from getRole():hasAdminTool() in its prerender,
--- only shows warManagerBtn while a war is running, and moves that one up to close the gap
--- when adminBtn is hidden. visibility is the test, not existence, or we would hang off a
--- button nobody can see.
+-- the lowest button actually on screen, worked out every frame: ISEquippedItem toggles
+-- adminBtn from hasAdminTool() in prerender, shows warManagerBtn only during a war, and moves
+-- it up when adminBtn is hidden. visibility is the test, not existence, or we would hang off
+-- a button nobody can see.
 local function PLS_anchor(panel)
     local lowest, bottom = nil, -1
     for _, name in ipairs(BUTTONS) do
@@ -90,8 +89,8 @@ end
 local PODIUM = { PLS_Theme.COL_SECOND, PLS_Theme.COL_FIRST, PLS_Theme.COL_THIRD }
 local PODIUM_SCALE = { 0.55, 0.85, 0.40 }
 
--- stands in until there is art at the paths in setTextures. three bars in the medal
--- colours the theme already carries, so it scales to any sidebar size for free.
+-- stands in until there is art at the paths in setTextures. three bars in the medal colours
+-- the theme already carries, so it scales to any sidebar size for free.
 function PLS_Popup:drawPodium(lit)
     local alpha = lit and 1 or 0.6
     local pad = math.max(2, math.floor(self.width * 0.16))
@@ -186,8 +185,8 @@ local function PLS_ensurePopup(panel)
     panel.PLS_popup:setTextures(textureWidth)
 end
 
--- the cell is always up, the way the rest of the column is. tutorial is the one place the
--- sidebar is not the player's to poke at.
+-- the cell is always up, like the rest of the column. tutorial is the one place the sidebar
+-- is not the player's to poke at.
 local function PLS_updateVisibility(panel)
     if not panel or not panel.PLS_popup then return end
     if not PLS_isCurrentPanel(panel) then return end
@@ -220,8 +219,8 @@ local function PLS_patchSidebar()
         PLS_ensurePopup(self)
     end
 
-    -- vanilla runs first, so anything that goes wrong in here costs us our cell rather
-    -- than the player's whole sidebar.
+    -- vanilla runs first, so a fault in here costs us our cell rather than the player's whole
+    -- sidebar.
     function ISEquippedItem:prerender()
         if originalPrerender then originalPrerender(self) end
         if not PLS_isCurrentPanel(self) then return end
