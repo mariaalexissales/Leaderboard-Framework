@@ -45,6 +45,10 @@ function handlers.toast(args)
     PLS_Chat.toast(args)
 end
 
+function handlers.dump(args)
+    PLS_Chat.dump(args)
+end
+
 function PLS_ClientState.onCommand(module, command, args)
     if module ~= PLS.MODULE then return end
 

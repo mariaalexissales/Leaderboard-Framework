@@ -180,6 +180,19 @@ function PLS_Chat.announce(args)
     PLS_halo(args.name, getText("IGUI_PLS_AnnounceHalo", title))
 end
 
+-- the answer to /pls, straight from the server's own copy of the table. grey like a notice,
+-- because it is the game answering something this player just typed rather than news.
+--
+-- untranslated on purpose: these lines get pasted into bug reports, and a stable string is
+-- worth more there than a localised one.
+function PLS_Chat.dump(args)
+    if not args or type(args.lines) ~= "table" then return end
+
+    for _, line in ipairs(args.lines) do
+        PLS_Chat.line(COL_NOTICE .. "[PLS] " .. tostring(line))
+    end
+end
+
 -- the server's acknowledgement of something an admin asked for. only reset today, but the
 -- kind is on the wire so a second one does not need a second command.
 function PLS_Chat.toast(args)
