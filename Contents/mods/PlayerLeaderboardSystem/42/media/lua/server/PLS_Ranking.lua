@@ -35,28 +35,86 @@ local function PLS_eachPlayer(fn)
     end
 end
 
--- the whole board, in order, not just the part that gets sent. a player outside the top
--- ten still has to be told their own rank, and that number only exists here.
-function PLS_Ranking.ranked(board)
+-- ----------------------------------------------------------------------------
+-- the view
+-- ----------------------------------------------------------------------------
+--
+-- one board, sorted, with everything anybody asks of it worked out at the same time.
+--
+-- four questions used to each rebuild and re-sort the whole table for themselves: the top ten,
+-- one player's rank, who is first, and where a score would place. only the first of those needs
+-- an ordering at all, and none of them needed a copy of their own -- on a full server that was a
+-- sort per death, per join, and per push, plus a scan of every player for every player.
+--
+-- the sort is over an array of names rather than one of {name, score} rows, so a rebuild
+-- allocates a handful of tables instead of one per ranked player. everything reads score[name].
+local cache = {}
+
+local function PLS_build(board)
+    -- read before the work, not after: the number this view is answered against has to be the
+    -- one that was current when it was built.
+    local at = PLS_State.version[board] or 0
+
     local data = PLS_State.ensure()
     local floor = tonumber(PLS.sandbox("MinScoreToRank", 1)) or 1
-    local rows = {}
+
+    local names, score = {}, {}
 
     for username, entry in pairs(data.players) do
-        local score = entry[board]
-        if score and score >= floor then
-            rows[#rows + 1] = { name = username, score = score }
+        local value = entry[board]
+        if value and value >= floor then
+            names[#names + 1] = username
+            score[username] = value
         end
     end
 
-    table.sort(rows, function(a, b)
-        if a.score ~= b.score then return a.score > b.score end
+    table.sort(names, function(a, b)
+        local sa, sb = score[a], score[b]
+        if sa ~= sb then return sa > sb end
         -- ties broken by name so the order is fixed. two players sitting on the same
         -- score must not be able to trade first place back and forth between sorts.
-        return a.name < b.name
+        return a < b
     end)
 
-    return rows
+    -- rank by name, built once here rather than rediscovered by walking this list for every
+    -- online player on every push. that walk was the cost of a board update on a busy server:
+    -- one pass here replaces one pass per player.
+    local rankOf = {}
+    for i = 1, #names do rankOf[names[i]] = i end
+
+    -- dense from 1 and short keys: this goes over the wire on every recompute, to everybody.
+    -- BoardSize is read here rather than passed in, so the two callers cannot disagree.
+    local limit = tonumber(PLS.sandbox("BoardSize", 10)) or 10
+    local rows = {}
+    for i = 1, math.min(#names, limit) do
+        rows[i] = { n = names[i], s = score[names[i]] }
+    end
+
+    return { at = at, names = names, score = score, rankOf = rankOf, rows = rows, total = #names }
+end
+
+-- rebuilt only when the board's standings have actually moved. PLS_State.markDirty counts those
+-- moves, and the count keeps climbing after the dirty flag has been drained, which is what lets
+-- a view built at any point still tell whether it has been overtaken.
+local function PLS_view(board)
+    local view = cache[board]
+    if view and view.at == (PLS_State.version[board] or 0) then return view end
+
+    view = PLS_build(board)
+    cache[board] = view
+
+    return view
+end
+
+-- who is first as the standings stand. PLS_State.leader is a different question -- it is the
+-- record of who was last announced -- so this is topOf rather than leader.
+function PLS_Ranking.topOf(board)
+    local view = PLS_view(board)
+
+    local name = view.names[1]
+    if not name then return nil end
+
+    return name, view.score[name]
 end
 
 -- where a score of this size would sit on a board, without it having to be anybody's. one
@@ -69,65 +127,55 @@ end
 function PLS_Ranking.placeOf(board, score)
     score = tonumber(score) or 0
 
-    local place = 1
-    for _, row in ipairs(PLS_Ranking.ranked(board)) do
-        -- ranked() is sorted, so the first one not above us ends it.
-        if row.score <= score then break end
-        place = place + 1
+    local view = PLS_view(board)
+    local names, by = view.names, view.score
+
+    -- the list is in order already, so this is a search and not a count. lo settles on the
+    -- first entry not strictly above us, and that index is the place we take -- one past the
+    -- end when everybody is above, which is the right answer too.
+    local lo, hi = 1, #names + 1
+
+    while lo < hi do
+        local mid = math.floor((lo + hi) / 2)
+        if by[names[mid]] > score then lo = mid + 1 else hi = mid end
     end
 
-    return place
+    return lo
 end
 
--- dense from 1 and short keys: this goes over the wire on every recompute, to everybody.
--- BoardSize is read here rather than passed in, so the two callers cannot disagree.
-local function PLS_wire(ranked)
-    local limit = tonumber(PLS.sandbox("BoardSize", 10)) or 10
-    local rows = {}
-    for i = 1, math.min(#ranked, limit) do
-        rows[i] = { n = ranked[i].name, s = ranked[i].score }
-    end
-    return rows
-end
-
-function PLS_Ranking.send(player, board, ranked, rows)
+function PLS_Ranking.send(player, board, view)
     if not player then return end
 
     local me = PLS.nameOf(player)
-    local rank = nil
-
-    if me then
-        for i, row in ipairs(ranked) do
-            if row.name == me then
-                rank = i
-                break
-            end
-        end
-    end
 
     PLS_Net.toClient(player, "board", {
         board = board,
-        rows = rows,
-        total = #ranked,
+        rows = view.rows,
+        total = view.total,
         -- the player's own standing rides along, so the footer strip is right even when
-        -- they are nowhere near the part of the board they can see.
-        rank = rank,
+        -- they are nowhere near the part of the board they can see. nil when they are not on
+        -- the board at all, exactly as the scan it replaces left it.
+        rank = me and view.rankOf[me],
+        -- their real score, read past the view rather than out of it: somebody under
+        -- MinScoreToRank is not on the board but is still owed the number they have.
         score = me and PLS_State.get(me, board) or 0,
     })
 end
 
 -- announce only a genuine change of first place. a leader change is recorded either way,
 -- so the next comparison is against what is actually on the board.
-local function PLS_checkLeader(board, ranked)
-    local top = ranked[1]
-    if not top then return end
+local function PLS_checkLeader(board, view)
+    local topName = view.names[1]
+    if not topName then return end
+
+    local topScore = view.score[topName]
 
     local previous = PLS_State.leader(board)
     local now = getTimestampMs()
 
-    if previous and previous.name == top.name then
+    if previous and previous.name == topName then
         -- same player, higher score. keep the record current without saying anything.
-        PLS_State.setLeader(board, top.name, top.score, previous.at)
+        PLS_State.setLeader(board, topName, topScore, previous.at)
         return
     end
 
@@ -136,7 +184,7 @@ local function PLS_checkLeader(board, ranked)
 
     -- strictly ahead, not merely level. someone who climbs into a tie and wins the
     -- alphabetical tie-break has not taken first place off anybody.
-    local announce = top.score > previousScore
+    local announce = topScore > previousScore
         and PLS.sandbox("AnnounceFirstPlace", true) == true
 
     if announce and lastAt > 0 then
@@ -144,10 +192,10 @@ local function PLS_checkLeader(board, ranked)
         if now - lastAt < cooldown then announce = false end
     end
 
-    PLS_State.setLeader(board, top.name, top.score, announce and now or lastAt)
+    PLS_State.setLeader(board, topName, topScore, announce and now or lastAt)
 
     if announce then
-        PLS_Net.toAll("announce", { board = board, name = top.name, score = top.score })
+        PLS_Net.toAll("announce", { board = board, name = topName, score = topScore })
     end
 end
 
@@ -158,23 +206,25 @@ function PLS_Ranking.recompute(board)
 
     if not PLS_Boards.enabled(board) then return end
 
-    local ranked = PLS_Ranking.ranked(board)
-    local rows = PLS_wire(ranked)
+    -- built once for everybody. the rows on the wire and every player's own rank come out of
+    -- the same view, so they cannot disagree and it cannot be sorted twice.
+    local view = PLS_view(board)
 
-    PLS_checkLeader(board, ranked)
+    PLS_checkLeader(board, view)
 
     PLS_eachPlayer(function(player)
-        PLS_Ranking.send(player, board, ranked, rows)
+        PLS_Ranking.send(player, board, view)
     end)
 end
 
--- one player, every board. this is the handshake reply.
+-- one player, every board. this is the handshake reply, and on a server that has been up a
+-- while it is answered entirely out of the cache: nothing here has to sort anything.
+-- ordered() has already dropped the boards that are switched off.
 function PLS_Ranking.sendAll(player)
     if not player then return end
 
     for _, def in ipairs(PLS_Boards.ordered()) do
-        local ranked = PLS_Ranking.ranked(def.key)
-        PLS_Ranking.send(player, def.key, ranked, PLS_wire(ranked))
+        PLS_Ranking.send(player, def.key, PLS_view(def.key))
     end
 end
 

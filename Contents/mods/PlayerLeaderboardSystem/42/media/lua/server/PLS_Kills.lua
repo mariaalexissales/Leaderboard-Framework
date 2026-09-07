@@ -253,10 +253,13 @@ local function PLS_lifeBoards()
 end
 
 -- keyed by group, because that is what a run is counted under.
-local function PLS_runsOf(victim)
+--
+-- the board list is passed in rather than asked for. a death used to call PLS_lifeBoards three
+-- times over, and each call reads the sandbox once per registered board and sorts the result.
+local function PLS_runsOf(victim, boards)
     local runs = {}
 
-    for _, def in ipairs(PLS_lifeBoards()) do
+    for _, def in ipairs(boards) do
         runs[def.group] = PLS_State.lifeGet(victim, def.group)
     end
 
@@ -275,12 +278,14 @@ end
 -- the first per-life board this player is top of, or nil. read before the kill is credited:
 -- the credit can push the killer past the very record they just ended, and asking afterwards
 -- would find the killer at the top and nobody who had been first place a moment ago.
-local function PLS_toppedBoard(victim)
-    for _, def in ipairs(PLS_lifeBoards()) do
-        local top = PLS_Ranking.ranked(def.key)[1]
+local function PLS_toppedBoard(victim, boards)
+    for _, def in ipairs(boards) do
+        -- topOf rather than the whole board sorted so that its first row can be read and the
+        -- rest thrown away.
+        local name, score = PLS_Ranking.topOf(def.key)
         -- registry order, so somebody holding both is announced once and for the same board
         -- every time rather than whichever way a pairs() loop happened to fall.
-        if top and top.name == victim then return def, top.score end
+        if name == victim then return def, score end
     end
 
     return nil
@@ -291,12 +296,12 @@ end
 -- the question is asked of the run, not of the record behind it. a board like this ranks
 -- somebody's best ever life, and a record holder dying on a fresh three-kill one has lost
 -- nothing worth saying out loud -- while a run that places is exactly what it cost them.
-local function PLS_announceFallen(victim, runs, now)
+local function PLS_announceFallen(victim, runs, now, boards)
     if not PLS_upsetReady(victim, now) then return end
 
     local best, bestPlace, bestRun
 
-    for _, def in ipairs(PLS_lifeBoards()) do
+    for _, def in ipairs(boards) do
         local run = runs[def.group] or 0
 
         if run > 0 then
@@ -363,10 +368,13 @@ function PLS_Kills.onDeath(player, args)
     if now - (lastDeath[victim] or 0) < DEATH_COOLDOWN_MS then return end
     lastDeath[victim] = now
 
+    -- once, and handed to each of the three below. this used to be three separate calls.
+    local boards = PLS_lifeBoards()
+
     -- both read before anything below changes them: endLife wipes the runs, and crediting
     -- the kill can move the top of a board.
-    local runs = PLS_runsOf(victim)
-    local topped, toppedScore = PLS_toppedBoard(victim)
+    local runs = PLS_runsOf(victim, boards)
+    local topped, toppedScore = PLS_toppedBoard(victim, boards)
 
     -- first, and whatever comes of the ledger below: the run is over however it ended, and
     -- most deaths are not pvp at all. a client can send a death it did not have, and all
@@ -377,7 +385,7 @@ function PLS_Kills.onDeath(player, args)
     -- cooldown here and leave the slain line below unsaid. one death is worth one line, and
     -- of the two this is the one that describes what actually killed them.
     if args and args.cause == "zombie" then
-        PLS_announceFallen(victim, runs, now)
+        PLS_announceFallen(victim, runs, now, boards)
     end
 
     if not PLS_Boards.tracked("pvp") then return end

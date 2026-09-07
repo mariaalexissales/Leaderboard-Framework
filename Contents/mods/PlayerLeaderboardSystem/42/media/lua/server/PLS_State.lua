@@ -16,6 +16,12 @@ PLS_State.data = PLS_State.data or nil
 -- boards whose standings have moved since the last recompute. PLS_Ranking drains this.
 PLS_State.dirty = PLS_State.dirty or {}
 
+-- how many times each board's standings have moved, ever, this session. PLS_Ranking caches a
+-- sorted view per board and compares the number it built against against this one, so the
+-- counter has to keep climbing after dirty has been drained -- which is exactly why it is a
+-- second thing and not a reuse of the flag above. runtime only: a restart rebuilds every view.
+PLS_State.version = PLS_State.version or {}
+
 -- keyed by username in global mod data, never player:getModData(). a client's own mod data
 -- is that client's copy and is never pushed up, so it cannot be trusted with a score.
 function PLS_State.ensure()
@@ -67,6 +73,7 @@ function PLS_State.markDirty(board)
     if not board then return end
 
     PLS_State.dirty[board] = true
+    PLS_State.version[board] = (PLS_State.version[board] or 0) + 1
 end
 
 function PLS_State.add(username, board, amount)
