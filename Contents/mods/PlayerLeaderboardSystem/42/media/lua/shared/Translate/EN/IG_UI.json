@@ -19,6 +19,12 @@
 
   "IGUI_PLS_Announce": "%1 has taken first place in %2, with %3 %4!",
   "IGUI_PLS_AnnounceHalo": "First place in %1!",
+  "IGUI_PLS_AnnounceSlain": "%1 has cut down %2, first place in %3!",
+  "IGUI_PLS_AnnounceSlainHalo": "You've cut down first place!",
+  "IGUI_PLS_AnnounceFallen": "%2's run of %3 %4 ends in a horde. It was %1 on %5.",
+  "IGUI_PLS_Ordinal1st": "1st",
+  "IGUI_PLS_Ordinal2nd": "2nd",
+  "IGUI_PLS_Ordinal3rd": "3rd",
 
   "IGUI_PLS_Refresh": "Refresh",
   "IGUI_PLS_Reset": "Reset Board",

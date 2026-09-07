@@ -40,6 +40,18 @@ option PlayerLeaderboardSystem.AnnounceCooldownMinutes
     page = PlayerLeaderboardSystem, translation = PLS_AnnounceCooldownMinutes,
 }
 
+option PlayerLeaderboardSystem.AnnounceUpsets
+{
+    type = boolean, default = true,
+    page = PlayerLeaderboardSystem, translation = PLS_AnnounceUpsets,
+}
+
+option PlayerLeaderboardSystem.AnnounceUpsetCooldownMinutes
+{
+    type = integer, min = 0, max = 120, default = 5,
+    page = PlayerLeaderboardSystem, translation = PLS_AnnounceUpsetCooldownMinutes,
+}
+
 option PlayerLeaderboardSystem.BoardSize
 {
     type = integer, min = 3, max = 50, default = 10,

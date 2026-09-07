@@ -46,13 +46,23 @@ local function PLS_onPlayerDeath(player)
 
     -- sent even when this comes back nil: the server still has its ledger, and a death
     -- with no claim attached is the honest shape of being shot from off screen.
+    --
+    -- the cause rides along off the same call. it is what the server needs to tell a run
+    -- that ended in a horde from one that ended in a fall, and it is this client's word for
+    -- it like everything else on this path -- a modified one could claim a horde it never
+    -- met, and buy itself a single chat line about its own death, throttled at the far end.
     local killer = nil
+    local cause = nil
     local attacker = player:getAttackedBy()
+
     if attacker and instanceof(attacker, "IsoPlayer") then
         killer = PLS.nameOf(attacker)
+        cause = "player"
+    elseif attacker and instanceof(attacker, "IsoZombie") then
+        cause = "zombie"
     end
 
-    PLS_Net.toServer("death", { killer = killer })
+    PLS_Net.toServer("death", { killer = killer, cause = cause })
 end
 
 -- the fallback for servers that hand back a nil attacker on OnZombieDead. off unless

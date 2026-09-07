@@ -14,6 +14,10 @@ local COL_ANNOUNCE = "<RGB:0.98,0.82,0.45>"
 -- else, so it sits back in the grey rather than competing with an announcement.
 local COL_NOTICE = "<RGB:0.66,0.66,0.66>"
 
+-- somebody lost something. the same weight as an announcement, because it is news of the
+-- same size, but it must not read gold like a triumph.
+local COL_UPSET = "<RGB:0.90,0.45,0.42>"
+
 -- chat is somebody else's window and its tabs come from the server on their own packet, well
 -- after OnGameStart. until the first one lands ISChat.instance.chatText is nil, and a board
 -- announcement broadcast while somebody is still loading in used to land in that hole. vanilla
@@ -129,24 +133,51 @@ local function PLS_boardTitle(board)
     return def and getText(def.announce or def.title) or board
 end
 
+-- only ever a top three, so three strings rather than a suffix rule: english ordinals do
+-- not survive translation as one, and the fourth place this cannot render never arrives.
+local ORDINALS = { "IGUI_PLS_Ordinal1st", "IGUI_PLS_Ordinal2nd", "IGUI_PLS_Ordinal3rd" }
+
+local function PLS_ordinal(place)
+    local key = ORDINALS[tonumber(place) or 0]
+    return key and getText(key) or ("#" .. tostring(place))
+end
+
+-- the halo goes to whoever the news is good for, which is not always the name in the line.
+local function PLS_halo(name, text)
+    local player = getPlayer()
+    if not player or not name or PLS.nameOf(player) ~= name then return end
+    if not HaloTextHelper or not HaloTextHelper.addGoodText then return end
+
+    pcall(function() HaloTextHelper.addGoodText(player, text) end)
+end
+
+-- three kinds now, and an announcement that arrives without one is the leader change this
+-- only ever used to carry.
 function PLS_Chat.announce(args)
     if not args or not args.name or not args.board then return end
 
     local def = PLS_Boards.get(args.board)
     local title = PLS_boardTitle(args.board)
     local unit = def and getText(def.unit) or ""
+    local score = tostring(args.score or 0)
 
-    PLS_Chat.line(COL_ANNOUNCE .. getText("IGUI_PLS_Announce",
-        args.name, title, tostring(args.score or 0), unit))
-
-    local player = getPlayer()
-    if not player or PLS.nameOf(player) ~= args.name then return end
-
-    if HaloTextHelper and HaloTextHelper.addGoodText then
-        pcall(function()
-            HaloTextHelper.addGoodText(player, getText("IGUI_PLS_AnnounceHalo", title))
-        end)
+    if args.kind == "slain" then
+        PLS_Chat.line(COL_UPSET .. getText("IGUI_PLS_AnnounceSlain",
+            args.name, tostring(args.victim), title))
+        -- to the killer. the player this is about is dead and looking at a death screen.
+        PLS_halo(args.name, getText("IGUI_PLS_AnnounceSlainHalo"))
+        return
     end
+
+    if args.kind == "fallen" then
+        PLS_Chat.line(COL_UPSET .. getText("IGUI_PLS_AnnounceFallen",
+            PLS_ordinal(args.place), args.name, score, unit, title))
+        -- nobody. PLS_Panel closes the window on death, and there is no one here to cheer.
+        return
+    end
+
+    PLS_Chat.line(COL_ANNOUNCE .. getText("IGUI_PLS_Announce", args.name, title, score, unit))
+    PLS_halo(args.name, getText("IGUI_PLS_AnnounceHalo", title))
 end
 
 -- the server's acknowledgement of something an admin asked for. only reset today, but the

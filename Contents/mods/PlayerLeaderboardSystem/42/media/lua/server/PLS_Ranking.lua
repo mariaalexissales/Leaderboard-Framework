@@ -59,6 +59,26 @@ function PLS_Ranking.ranked(board)
     return rows
 end
 
+-- where a score of this size would sit on a board, without it having to be anybody's. one
+-- past everyone strictly above it.
+--
+-- strictly is the whole of it. a player dying on the very run that set their record has an
+-- entry on the board equal to that run, and must place at their own rank rather than one
+-- below it -- which is also why "the run that just ended places top three" is a tighter
+-- question than "this player is top three", and the one worth announcing.
+function PLS_Ranking.placeOf(board, score)
+    score = tonumber(score) or 0
+
+    local place = 1
+    for _, row in ipairs(PLS_Ranking.ranked(board)) do
+        -- ranked() is sorted, so the first one not above us ends it.
+        if row.score <= score then break end
+        place = place + 1
+    end
+
+    return place
+end
+
 -- dense from 1 and short keys: this goes over the wire on every recompute, to everybody.
 -- BoardSize is read here rather than passed in, so the two callers cannot disagree.
 local function PLS_wire(ranked)

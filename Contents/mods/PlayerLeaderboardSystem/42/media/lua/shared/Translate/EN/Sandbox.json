@@ -19,6 +19,12 @@
   "Sandbox_PLS_AnnounceCooldownMinutes": "Announce Cooldown",
   "Sandbox_PLS_AnnounceCooldownMinutes_tooltip": "Real minutes to wait between announcements on the same board, so two players trading the lead cannot flood chat. (0-120)",
 
+  "Sandbox_PLS_AnnounceUpsets": "Announce Upsets",
+  "Sandbox_PLS_AnnounceUpsets_tooltip": "Tells the whole server when someone kills the player at the top of a Per Life board, and when a run good enough to place in the top three ends in a horde. Reads the Per Life boards only, so it does nothing if both of those are switched off.",
+
+  "Sandbox_PLS_AnnounceUpsetCooldownMinutes": "Upset Cooldown",
+  "Sandbox_PLS_AnnounceUpsetCooldownMinutes_tooltip": "Real minutes before the same player is worth announcing again, so somebody hunting the same champion cannot flood chat. Two different players falling in the same minute are still two announcements. (0-120)",
+
   "Sandbox_PLS_BoardSize": "Board Size",
   "Sandbox_PLS_BoardSize_tooltip": "How many ranks the server sends to each client. Players outside this still see their own standing. (3-50)",
 

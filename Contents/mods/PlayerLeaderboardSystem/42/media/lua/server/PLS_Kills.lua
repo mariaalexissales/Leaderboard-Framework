@@ -3,8 +3,10 @@
 ----------
 
 require "PLS_Core"
+require "PLS_Net"
 require "PLS_Boards"
 require "PLS_State"
+require "PLS_Ranking"
 
 if not PLS.isAuthority() then return end
 
@@ -53,6 +55,10 @@ function PLS_Kills.forgetOffline(online)
             debugMode[username] = nil
             warned[username] = nil
         end
+    end
+
+    for username in pairs(PLS_Kills.lastUpset) do
+        if not online[username] then PLS_Kills.lastUpset[username] = nil end
     end
 end
 
@@ -220,6 +226,118 @@ function PLS_Kills.onHit(player, args)
     hits[victim][attacker] = now
 end
 
+-- ----------------------------------------------------------------------------
+-- the two announcements a death is worth
+-- ----------------------------------------------------------------------------
+--
+-- both read the per-life boards and nothing else. an all-time board is cumulative, so a
+-- death costs whoever tops it exactly nothing, and saying otherwise in chat would be a lie
+-- everyone can check.
+
+local ANNOUNCE_TOP = 3
+
+-- username -> when an upset was last announced about them. runtime only, like the ledger and
+-- the debug map above, and swept with them. on the table rather than a local so the sweep,
+-- which runs further up this file, can reach it.
+PLS_Kills.lastUpset = PLS_Kills.lastUpset or {}
+
+-- the enabled per-life boards, in registry order.
+local function PLS_lifeBoards()
+    local list = {}
+
+    for _, def in ipairs(PLS_Boards.ordered()) do
+        if def.scope == "life" then list[#list + 1] = def end
+    end
+
+    return list
+end
+
+-- keyed by group, because that is what a run is counted under.
+local function PLS_runsOf(victim)
+    local runs = {}
+
+    for _, def in ipairs(PLS_lifeBoards()) do
+        runs[def.group] = PLS_State.lifeGet(victim, def.group)
+    end
+
+    return runs
+end
+
+-- whether an upset about this player is wanted and due. the stamp is spent by the caller and
+-- only once something is actually said, so a quiet death does not burn the window.
+local function PLS_upsetReady(victim, now)
+    if PLS.sandbox("AnnounceUpsets", true) ~= true then return false end
+
+    local cooldown = (tonumber(PLS.sandbox("AnnounceUpsetCooldownMinutes", 5)) or 5) * 60000
+    return now - (PLS_Kills.lastUpset[victim] or 0) >= cooldown
+end
+
+-- the first per-life board this player is top of, or nil. read before the kill is credited:
+-- the credit can push the killer past the very record they just ended, and asking afterwards
+-- would find the killer at the top and nobody who had been first place a moment ago.
+local function PLS_toppedBoard(victim)
+    for _, def in ipairs(PLS_lifeBoards()) do
+        local top = PLS_Ranking.ranked(def.key)[1]
+        -- registry order, so somebody holding both is announced once and for the same board
+        -- every time rather than whichever way a pairs() loop happened to fall.
+        if top and top.name == victim then return def, top.score end
+    end
+
+    return nil
+end
+
+-- a run that would have placed in the top three has ended in a horde.
+--
+-- the question is asked of the run, not of the record behind it. a board like this ranks
+-- somebody's best ever life, and a record holder dying on a fresh three-kill one has lost
+-- nothing worth saying out loud -- while a run that places is exactly what it cost them.
+local function PLS_announceFallen(victim, runs, now)
+    if not PLS_upsetReady(victim, now) then return end
+
+    local best, bestPlace, bestRun
+
+    for _, def in ipairs(PLS_lifeBoards()) do
+        local run = runs[def.group] or 0
+
+        if run > 0 then
+            local place = PLS_Ranking.placeOf(def.key, run)
+
+            -- the board it placed highest on. somebody caught mid-rampage reports whichever
+            -- of their runs was worth more, which is the honest answer to what they lost.
+            if place <= ANNOUNCE_TOP and (not bestPlace or place < bestPlace) then
+                best, bestPlace, bestRun = def, place, run
+            end
+        end
+    end
+
+    if not best then return end
+
+    PLS_Kills.lastUpset[victim] = now
+    PLS_Net.toAll("announce", {
+        kind = "fallen",
+        board = best.key,
+        name = victim,
+        score = bestRun,
+        place = bestPlace,
+    })
+end
+
+-- somebody took the top of a per-life board off the player who held it. called after the
+-- credit, with the board that was captured before it.
+local function PLS_announceSlain(victim, killer, board, score, now)
+    if not board or not killer then return end
+    if not PLS_upsetReady(victim, now) then return end
+
+    PLS_Kills.lastUpset[victim] = now
+    PLS_Net.toAll("announce", {
+        kind = "slain",
+        board = board.key,
+        name = killer,
+        victim = victim,
+        score = score,
+    })
+end
+
 -- a death ends every kind's run at once. gated on there being a per-life board to end one
 -- for, so a server running account boards alone keeps no life state at all.
 function PLS_Kills.endLife(username)
@@ -245,10 +363,22 @@ function PLS_Kills.onDeath(player, args)
     if now - (lastDeath[victim] or 0) < DEATH_COOLDOWN_MS then return end
     lastDeath[victim] = now
 
+    -- both read before anything below changes them: endLife wipes the runs, and crediting
+    -- the kill can move the top of a board.
+    local runs = PLS_runsOf(victim)
+    local topped, toppedScore = PLS_toppedBoard(victim)
+
     -- first, and whatever comes of the ledger below: the run is over however it ended, and
     -- most deaths are not pvp at all. a client can send a death it did not have, and all
     -- that buys is resetting its own run, whose record is already banked on the board.
     PLS_Kills.endLife(victim)
+
+    -- a horde landing the final blow on somebody a player had been working on will spend the
+    -- cooldown here and leave the slain line below unsaid. one death is worth one line, and
+    -- of the two this is the one that describes what actually killed them.
+    if args and args.cause == "zombie" then
+        PLS_announceFallen(victim, runs, now)
+    end
 
     if not PLS_Boards.tracked("pvp") then return end
 
@@ -281,4 +411,5 @@ function PLS_Kills.onDeath(player, args)
     if not killer or killer == victim then return end
 
     PLS_Kills.credit(killer, "pvp", 1)
+    PLS_announceSlain(victim, killer, topped, toppedScore, now)
 end
