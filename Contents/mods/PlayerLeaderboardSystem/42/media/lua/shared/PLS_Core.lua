@@ -157,19 +157,34 @@ end
 -- every score is keyed by this. getUsername is the account name on a server and is what
 -- has to survive a death, but singleplayer leaves it empty, so a solo game falls back to
 -- the character's own name and scores per character instead.
+local function PLS_characterName(player)
+    local descriptor = player:getDescriptor()
+    if not descriptor then return nil end
+
+    local forename = descriptor:getForename() or ""
+    local surname = descriptor:getSurname() or ""
+    local full = (forename .. " " .. surname):gsub("^%s+", ""):gsub("%s+$", "")
+
+    if full == "" then return nil end
+    return full
+end
+
 function PLS.nameOf(player)
     if not player then return nil end
+
+    -- singleplayer scores per character, so the name on a board should be the one on the
+    -- character sheet. asked first rather than as a fallback because b42 answers getUsername
+    -- here too, with the forename and surname run together -- "JudieHolman" is nobody's name,
+    -- and it is what used to end up on the board. both flags off is the test for no
+    -- multiplayer at all, the same one PLS.isAdmin uses, and it covers a splitscreen second
+    -- player, who gets their own character's name rather than sharing one.
+    if not isClient() and not isServer() then
+        local character = PLS_characterName(player)
+        if character then return character end
+    end
 
     local username = player:getUsername()
     if username and username ~= "" then return username end
 
-    local descriptor = player:getDescriptor()
-    if descriptor then
-        local forename = descriptor:getForename() or ""
-        local surname = descriptor:getSurname() or ""
-        local full = (forename .. " " .. surname):gsub("^%s+", ""):gsub("%s+$", "")
-        if full ~= "" then return full end
-    end
-
-    return nil
+    return PLS_characterName(player)
 end
