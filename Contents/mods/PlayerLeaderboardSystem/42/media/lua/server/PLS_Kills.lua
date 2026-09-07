@@ -93,12 +93,36 @@ function PLS_Kills.shouldCount(player)
     return false
 end
 
+-- one kill, every enabled board for its kind. the best-life board is a high-water mark raised
+-- as the run passes it rather than banked when the run ends, so a player who has not died in a
+-- month still shows the run they are actually on.
+function PLS_Kills.credit(username, kind, amount)
+    if not username or not kind then return end
+
+    amount = amount or 1
+
+    local account = PLS_Boards.find(kind, "account")
+    if account and PLS_Boards.enabled(account) then
+        PLS_State.add(username, account, amount)
+        PLS.trace("credited " .. username .. " with " .. tostring(amount) .. " on " .. account)
+    end
+
+    local life = PLS_Boards.find(kind, "life")
+    if life and PLS_Boards.enabled(life) then
+        local run = PLS_State.lifeAdd(username, kind, amount)
+
+        if run > PLS_State.get(username, life) then
+            PLS_State.set(username, life, run)
+            PLS.trace(username .. " set a new " .. life .. " record of " .. tostring(run))
+        end
+    end
+end
+
 function PLS_Kills.creditZombie(username, amount)
     if not username then return end
-    if not PLS_Boards.enabled("zombie") then return end
+    if not PLS_Boards.tracked("zombie") then return end
 
-    PLS_State.add(username, "zombie", amount or 1)
-    PLS.trace("credited " .. username .. " with " .. tostring(amount or 1) .. " on zombie")
+    PLS_Kills.credit(username, "zombie", amount or 1)
 end
 
 local function PLS_onZombieDead(zombie)
@@ -176,7 +200,7 @@ end
 -- client chose, and the worst it can do is put a name in a ledger that is then only
 -- spent if that name actually dies.
 function PLS_Kills.onHit(player, args)
-    if not PLS_Boards.enabled("pvp") then return end
+    if not PLS_Boards.tracked("pvp") then return end
     if not player or not args then return end
     -- filtered here rather than at the death, because the credit is spent by name and the
     -- player object is only in hand on this side of it. a client in debug never enters the
@@ -196,9 +220,22 @@ function PLS_Kills.onHit(player, args)
     hits[victim][attacker] = now
 end
 
+-- a death ends every kind's run at once. gated on there being a per-life board to end one
+-- for, so a server running account boards alone keeps no life state at all.
+function PLS_Kills.endLife(username)
+    if not username then return end
+    if not PLS_Boards.anyLife() then return end
+
+    PLS_State.lifeClear(username)
+    PLS.trace("ended the life of " .. username)
+end
+
 -- player is the victim, handed over by the engine, never read out of args.
+--
+-- both halves of a death go through here rather than through two command handlers, because
+-- the cooldown below has to be spent once. two handlers reading it would mean whichever ran
+-- first silently ate the other.
 function PLS_Kills.onDeath(player, args)
-    if not PLS_Boards.enabled("pvp") then return end
     if not player then return end
 
     local victim = PLS.nameOf(player)
@@ -207,6 +244,13 @@ function PLS_Kills.onDeath(player, args)
     local now = getTimestampMs()
     if now - (lastDeath[victim] or 0) < DEATH_COOLDOWN_MS then return end
     lastDeath[victim] = now
+
+    -- first, and whatever comes of the ledger below: the run is over however it ended, and
+    -- most deaths are not pvp at all. a client can send a death it did not have, and all
+    -- that buys is resetting its own run, whose record is already banked on the board.
+    PLS_Kills.endLife(victim)
+
+    if not PLS_Boards.tracked("pvp") then return end
 
     PLS_prune(now)
 
@@ -236,5 +280,5 @@ function PLS_Kills.onDeath(player, args)
 
     if not killer or killer == victim then return end
 
-    PLS_State.add(killer, "pvp", 1)
+    PLS_Kills.credit(killer, "pvp", 1)
 end

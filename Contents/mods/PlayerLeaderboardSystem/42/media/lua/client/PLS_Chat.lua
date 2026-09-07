@@ -121,10 +121,12 @@ end
 
 PLS.guard("chat flush", Events.EveryOneMinute, PLS_flush)
 
--- an unregistered board still has a key, and printing that beats printing nothing.
+-- the announce name, not the tab label: a tab reads "Per Life" because the other half of the
+-- row says which kills, and a line in chat stands on its own. an unregistered board still has
+-- a key, and printing that beats printing nothing.
 local function PLS_boardTitle(board)
     local def = PLS_Boards.get(board)
-    return def and getText(def.title) or board
+    return def and getText(def.announce or def.title) or board
 end
 
 function PLS_Chat.announce(args)

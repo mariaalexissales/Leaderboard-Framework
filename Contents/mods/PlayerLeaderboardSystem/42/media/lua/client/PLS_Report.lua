@@ -15,8 +15,9 @@ local KILL_POLL_MS = 2000
 
 local lastHit = {}
 
+-- the ledger only ever feeds a pvp board, so this one still asks about that group alone.
 local function PLS_onWeaponHitCharacter(wielder, character, weapon, damage)
-    if not PLS_Boards.enabled("pvp") then return end
+    if not PLS_Boards.tracked("pvp") then return end
     if not wielder or not character then return end
     if not instanceof(wielder, "IsoPlayer") or not instanceof(character, "IsoPlayer") then return end
 
@@ -36,8 +37,11 @@ local function PLS_onWeaponHitCharacter(wielder, character, weapon, damage)
     PLS_Net.toServer("hit", { victim = victim })
 end
 
+-- a death is worth reporting for two unrelated reasons, so it asks about both. the per-life
+-- boards are the ones that matter here: pvp tracking is off in the shipped settings, and
+-- gating this on it alone left the running counts with nothing to reset them.
 local function PLS_onPlayerDeath(player)
-    if not PLS_Boards.enabled("pvp") then return end
+    if not PLS_Boards.tracked("pvp") and not PLS_Boards.anyLife() then return end
     if not player or not player:isLocalPlayer() then return end
 
     -- sent even when this comes back nil: the server still has its ledger, and a death

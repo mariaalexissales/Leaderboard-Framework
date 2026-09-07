@@ -10,10 +10,22 @@ option PlayerLeaderboardSystem.TrackZombieKills
     page = PlayerLeaderboardSystem, translation = PLS_TrackZombieKills,
 }
 
+option PlayerLeaderboardSystem.TrackZombieKillsPerLife
+{
+    type = boolean, default = true,
+    page = PlayerLeaderboardSystem, translation = PLS_TrackZombieKillsPerLife,
+}
+
 option PlayerLeaderboardSystem.TrackPlayerKills
 {
     type = boolean, default = false,
     page = PlayerLeaderboardSystem, translation = PLS_TrackPlayerKills,
+}
+
+option PlayerLeaderboardSystem.TrackPlayerKillsPerLife
+{
+    type = boolean, default = true,
+    page = PlayerLeaderboardSystem, translation = PLS_TrackPlayerKillsPerLife,
 }
 
 option PlayerLeaderboardSystem.AnnounceFirstPlace

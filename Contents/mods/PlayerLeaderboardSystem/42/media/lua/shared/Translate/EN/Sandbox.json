@@ -4,8 +4,14 @@
   "Sandbox_PLS_TrackZombieKills": "Track Zombie Kills",
   "Sandbox_PLS_TrackZombieKills_tooltip": "Scores every zombie a player kills and shows a Zombie Kills board.",
 
+  "Sandbox_PLS_TrackZombieKillsPerLife": "Zombie Kills Per Life",
+  "Sandbox_PLS_TrackZombieKillsPerLife_tooltip": "Adds a Per Life tab to the Zombie Kills board, ranking the most zombies anyone has killed on a single life. The record stands after the death that ended the run. Needs Track Zombie Kills on as well.",
+
   "Sandbox_PLS_TrackPlayerKills": "Track Player Kills",
   "Sandbox_PLS_TrackPlayerKills_tooltip": "Scores player-versus-player kills and shows a Player Kills board. Off by default.",
+
+  "Sandbox_PLS_TrackPlayerKillsPerLife": "Player Kills Per Life",
+  "Sandbox_PLS_TrackPlayerKillsPerLife_tooltip": "Adds a Per Life tab to the Player Kills board, ranking the most players anyone has killed on a single life. The record stands after the death that ended the run. Needs Track Player Kills on as well.",
 
   "Sandbox_PLS_AnnounceFirstPlace": "Announce First Place",
   "Sandbox_PLS_AnnounceFirstPlace_tooltip": "Tells the whole server in chat when a board's first place changes hands.",

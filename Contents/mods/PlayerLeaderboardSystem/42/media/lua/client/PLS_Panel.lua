@@ -37,13 +37,19 @@ function PLS_Panel:new(x, y, width, height, player)
     o.player = player
     o.playerNum = player:getPlayerNum()
     o.title = getText("IGUI_PLS_Title")
+    -- the two halves of the tab row are a coordinate; tab is the board key they land on,
+    -- and everything downstream of the panel still knows only about that.
+    o.group = nil
+    o.scope = nil
     o.tab = nil
     o.rows = {}
     o.revision = -1
     -- a peek closes on key release; a tap pins the window until the next tap.
     o.pinned = true
     o.resizable = true
-    o.minimumWidth = 380
+    -- both label pairs share one row, and the strip has no overflow handling, so the stop
+    -- has to come before the left half and the right half meet in the middle.
+    o.minimumWidth = 420
     o.minimumHeight = 300
 
     return o
@@ -81,19 +87,49 @@ function PLS_Panel:createChildren()
     local tabY, _, footerY = self:bands()
 
     self.tabs = {}
+    self.scopeTabs = {}
+
     local x = PAD
 
-    for _, def in ipairs(PLS_Boards.ordered()) do
-        local button = PLS_Button:new(x, tabY, 10, TAB_HEIGHT, getText(def.title), self, PLS_Panel.onTab)
+    for _, group in ipairs(PLS_Boards.groups()) do
+        local button = PLS_Button:new(x, tabY, 10, TAB_HEIGHT, getText(group.title), self, PLS_Panel.onTab)
         button:sizeToTitle(28)
-        button.board = def.key
+        button.group = group.key
         self:attach(button)
 
         self.tabs[#self.tabs + 1] = button
         x = button:getRight() + 4
+
+        -- the scope pair sits on the same row, hard against the right edge. every group's is
+        -- built now and hidden until its group is picked, rather than torn down and rebuilt on
+        -- each press. a group holding one board gets no scope button at all, which is what a
+        -- board registered without a group has always been.
+        --
+        -- laid out backwards from the right so the last one placed is the leftmost, which
+        -- leaves them reading in registry order on screen. anchored rather than repositioned
+        -- in onResize, the way the footer buttons already are.
+        local scopes = PLS_Boards.scopes(group.key)
+        if #scopes > 1 then
+            local scopeX = self.width - PAD
+
+            for i = #scopes, 1, -1 do
+                local def = scopes[i]
+                local tab = PLS_Button:new(0, tabY, 10, TAB_HEIGHT,
+                    getText(def.title), self, PLS_Panel.onScope)
+                tab:sizeToTitle(24)
+                tab:setX(scopeX - tab:getWidth())
+                tab.group = group.key
+                tab.scope = def.scope
+                tab.board = def.key
+                self:attach(tab, { anchorLeft = false, anchorRight = true })
+
+                self.scopeTabs[#self.scopeTabs + 1] = tab
+                scopeX = tab:getX() - 4
+            end
+        end
     end
 
-    if not self.tab and self.tabs[1] then self.tab = self.tabs[1].board end
+    self:select(self.tabs[1] and self.tabs[1].group, self.scope)
 
     local listX, listTop, listWidth, listHeight = self:listBounds()
 
@@ -130,8 +166,38 @@ function PLS_Panel:createChildren()
     self:refresh()
 end
 
+-- a group and a scope resolved down to the one board key the rest of the panel reads. the
+-- scope is carried across a group change wherever the new group offers it: paging between
+-- zombies and players while staying on per life is the move this is for.
+function PLS_Panel:select(group, scope)
+    self.group, self.scope, self.tab = nil, nil, nil
+    if not group then return end
+
+    local scopes = PLS_Boards.scopes(group)
+    local wanted = nil
+
+    for _, def in ipairs(scopes) do
+        if def.scope == scope then
+            wanted = def
+            break
+        end
+    end
+
+    wanted = wanted or scopes[1]
+    if not wanted then return end
+
+    self.group = group
+    self.scope = wanted.scope
+    self.tab = wanted.key
+end
+
 function PLS_Panel:onTab(button)
-    self.tab = button.board
+    self:select(button.group, self.scope)
+    self:refresh()
+end
+
+function PLS_Panel:onScope(button)
+    self:select(button.group, button.scope)
     self:refresh()
 end
 
@@ -201,6 +267,12 @@ function PLS_Panel:prerender()
     PLS_Theme.frame(self, PAD, listY, listW, listH, PLS_Theme.COL_FRAME)
 
     for _, button in ipairs(self.tabs or {}) do
+        button.selected = button.group == self.group
+    end
+
+    for _, button in ipairs(self.scopeTabs or {}) do
+        -- every group's pair was built at once, so all but the current one stays off screen.
+        button:setVisible(button.group == self.group)
         button.selected = button.board == self.tab
     end
 

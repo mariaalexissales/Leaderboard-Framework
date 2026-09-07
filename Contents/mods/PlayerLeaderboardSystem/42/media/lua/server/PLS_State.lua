@@ -29,6 +29,12 @@ function PLS_State.ensure()
     -- who held first place at the last announcement, so a restart does not re-announce
     -- whoever was already sitting on top.
     data.leaders = data.leaders or {}
+    -- kills on the life a player is on right now, keyed by kind rather than by board. a run
+    -- feeds the best-life board but is not itself a score, and keeping it out of data.players
+    -- keeps that table the flat board -> number map the ranking loop expects. persisted on
+    -- purpose: a restart must not hand everybody a fresh run.
+    --   username -> { zombie = n, pvp = n, h = hours survived when last seen }
+    data.lives = data.lives or {}
 
     return data
 end
@@ -80,6 +86,92 @@ function PLS_State.add(username, board, amount)
     return total
 end
 
+-- an absolute write, where add() is a delta. a best-life board is a high-water mark rather
+-- than a running total, so the only thing that can set it is the run that passed it.
+function PLS_State.set(username, board, value)
+    if not username or not board then return 0 end
+
+    value = tonumber(value) or 0
+    if value < 0 then value = 0 end
+
+    PLS_State.scores(username)[board] = value
+    PLS_State.markDirty(board)
+
+    return value
+end
+
+-- ----------------------------------------------------------------------------
+-- the life in progress
+-- ----------------------------------------------------------------------------
+
+-- reads without creating, for the same reason get() does.
+function PLS_State.lifeGet(username, kind)
+    if not username or not kind then return 0 end
+
+    local run = PLS_State.ensure().lives[username]
+    return run and run[kind] or 0
+end
+
+function PLS_State.lifeAdd(username, kind, amount)
+    if not username or not kind then return 0 end
+
+    amount = tonumber(amount) or 0
+    if amount == 0 then return PLS_State.lifeGet(username, kind) end
+
+    local data = PLS_State.ensure()
+    local run = data.lives[username]
+
+    if not run then
+        run = {}
+        data.lives[username] = run
+    end
+
+    local total = (run[kind] or 0) + amount
+    if total < 0 then total = 0 end
+
+    run[kind] = total
+    return total
+end
+
+-- every kind at once, because a death ends the whole life and not one board's part of it.
+-- the hours mark is carried over: it says which character this is, not what they scored.
+--
+-- replaced rather than emptied key by key while iterating it. kahlua is not a lua this mod
+-- gets to assume the standard's traversal rules from -- PLS_Ranking says the same about
+-- next() -- and the table is three numbers wide.
+function PLS_State.lifeClear(username)
+    if not username then return end
+
+    local data = PLS_State.ensure()
+    local run = data.lives[username]
+    if not run then return end
+
+    data.lives[username] = { h = run.h }
+end
+
+-- the hours survived this account was last seen on. a lower one next time means a different
+-- character, which is a death nobody reported.
+function PLS_State.lifeHours(username)
+    if not username then return nil end
+
+    local run = PLS_State.ensure().lives[username]
+    return run and run.h or nil
+end
+
+function PLS_State.setLifeHours(username, hours)
+    if not username then return end
+
+    local data = PLS_State.ensure()
+    local run = data.lives[username]
+
+    if not run then
+        run = {}
+        data.lives[username] = run
+    end
+
+    run.h = tonumber(hours) or 0
+end
+
 -- wipes one board without touching the others, so an admin can start a new zombie season
 -- and leave the pvp standings alone.
 function PLS_State.resetBoard(board)
@@ -89,6 +181,16 @@ function PLS_State.resetBoard(board)
 
     for _, entry in pairs(data.players) do
         entry[board] = nil
+    end
+
+    -- a per-life board is a record of runs, and the run that set one may still be going. wiping
+    -- the records without wiping those would put everybody back on the board at their old score
+    -- with their very next kill.
+    local def = PLS_Boards.get(board)
+    if def and def.scope == "life" then
+        for _, run in pairs(data.lives) do
+            run[def.group] = nil
+        end
     end
 
     data.leaders[board] = nil

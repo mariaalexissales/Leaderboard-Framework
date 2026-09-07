@@ -4,6 +4,10 @@
 
   "IGUI_PLS_BoardZombie": "Zombie Kills",
   "IGUI_PLS_BoardPvP": "Player Kills",
+  "IGUI_PLS_BoardZombieLife": "Zombie Kills, Best Life",
+  "IGUI_PLS_BoardPvPLife": "Player Kills, Best Life",
+  "IGUI_PLS_ScopeLife": "Per Life",
+  "IGUI_PLS_ScopeAccount": "All Time",
   "IGUI_PLS_UnitKills": "kills",
 
   "IGUI_PLS_Unranked": "Unranked",

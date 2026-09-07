@@ -49,6 +49,28 @@ local function PLS_sweep(now)
     PLS_Kills.forgetOffline(online)
 end
 
+-- the only way a best-life score can be inflated is a client that never sends its death
+-- packet, keeping one run alive across every death. this is the cheap cover for that: the
+-- engine puts a dead player back at the main menu, so a rejoin nearly always follows, and
+-- hours survived that have gone backwards mean a character this account has not been seen
+-- on before. costs one call on a handshake that already runs.
+local function PLS_checkLife(player, name)
+    if not PLS_Boards.anyLife() then return end
+
+    -- through pcall: not every build of every character class answers this, and a handshake
+    -- is a bad place to take the whole mod down over a stat nobody is ranked on.
+    local ok, hours = pcall(function() return player:getHoursSurvived() end)
+    if not ok or type(hours) ~= "number" then return end
+
+    local last = PLS_State.lifeHours(name)
+    if last and hours < last then
+        PLS.trace(name .. " said hello on a newer character, so the old life is over")
+        PLS_Kills.endLife(name)
+    end
+
+    PLS_State.setLifeHours(name, hours)
+end
+
 function PLS_Commands.handlers.hello(player, args)
     local name = player and PLS.nameOf(player)
     if not name then return end
@@ -63,6 +85,10 @@ function PLS_Commands.handlers.hello(player, args)
     -- has its second packet's word for what mode it is in, even though that packet is not
     -- worth a set of boards back.
     PLS_Kills.setDebug(name, args and args.debug)
+
+    -- above the floor for the same reason: a rejoin is the case this exists for, and it must
+    -- not be missed because the player pressed refresh on their way in.
+    PLS_checkLife(player, name)
 
     if now - (lastHello[name] or 0) < HELLO_COOLDOWN_MS then return end
     lastHello[name] = now
