@@ -52,7 +52,7 @@ description=
 description=[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3791631305][img]https://images.steamusercontent.com/ugc/11843508093091308261/A79EED3FC204D4945A5842ACFCD964749B4F39EE/[/img][/url]
 description=[b]Pinoy Pantry[/b] sarap ng Pinas in Knox Country
 description=
-description=[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3794717412][img]https://images.steamusercontent.com/ugc/14501720495950510138/1629AD8B1F25038431D45C94AC857E5B02524799/[/img][/url]
+description=[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3794717412][img]https://images.steamusercontent.com/ugc/16519464503512792082/F7CF881FECD1834E972FCA7CD23BB82DC1773C6C/[/img][/url]
 description=[b]Quest System Framework[/b]
 description=Add quests to your multiplayer servers
 tags=Build 42;Framework;Interface;Misc;Multiplayer;QoL;WIP
