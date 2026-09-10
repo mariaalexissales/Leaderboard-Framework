@@ -8,6 +8,7 @@ require "PLS_Boards"
 require "PLS_State"
 require "PLS_Kills"
 require "PLS_Ranking"
+require "PLS_Backup"
 
 if not PLS.isAuthority() then return end
 
@@ -156,6 +157,30 @@ local function PLS_dumpHealth()
     for _ in pairs(data.lives) do runs = runs + 1 end
     lines[#lines + 1] = "  lives tracked: " .. runs
 
+    -- whether a second copy is being written at all, and how old the one on disk is. with the
+    -- restore manual, "is my backup working" is the question this has to answer.
+    --
+    -- guarded, because this is the command somebody runs when things are already wrong. a
+    -- missing backup module should cost the report one line, not all of it.
+    if not PLS_Backup then
+        lines[#lines + 1] = "  backup: module not loaded"
+        return lines
+    end
+
+    if not PLS_Backup.enabled() then
+        lines[#lines + 1] = "  backup: switched off in the sandbox options"
+        return lines
+    end
+
+    local parsed, from = PLS_Backup.read()
+
+    if not parsed then
+        lines[#lines + 1] = "  backup: none at " .. PLS_Backup.shownPath()
+    else
+        lines[#lines + 1] = "  backup: " .. PLS_Backup.shownPath(from) .. " "
+            .. PLS.stampText(tonumber(parsed.savedAt) or 0)
+    end
+
     return lines
 end
 
@@ -228,6 +253,47 @@ function PLS_Commands.handlers.dump(player, args)
     PLS_Net.toClient(player, "dump", { lines = lines })
 end
 
+function PLS_Commands.handlers.backup(player, args)
+    if not PLS.isAdmin(player) then
+        PLS.warn(tostring(PLS.nameOf(player)) .. " asked to write a backup without permission")
+        return
+    end
+
+    local ok, path = PLS_Backup.save()
+    local data = PLS_State.ensure()
+
+    local n = 0
+    for _ in pairs(data.players) do n = n + 1 end
+
+    PLS_Net.toClient(player, "dump", {
+        lines = { ok and ("wrote " .. n .. " players to " .. PLS_Backup.shownPath(path))
+            or "the backup could not be written, see the server log" },
+    })
+end
+
+function PLS_Commands.handlers.restore(player, args)
+    if not PLS.isAdmin(player) then
+        PLS.warn(tostring(PLS.nameOf(player)) .. " asked to restore a backup without permission")
+        return
+    end
+
+    local ok, count, from = PLS_Backup.load()
+
+    -- pushed now rather than left to the pump, so whoever typed this sees the boards change
+    -- rather than wondering whether it took.
+    if ok then
+        for _, def in ipairs(PLS_Boards.ordered()) do
+            PLS_Ranking.recompute(def.key)
+        end
+    end
+
+    PLS_Net.toClient(player, "dump", {
+        lines = { ok and ("restored " .. tostring(count) .. " players from "
+            .. PLS_Backup.shownPath(from))
+            or "nothing to restore, see the server log" },
+    })
+end
+
 function PLS_Commands.handlers.reset(player, args)
     -- the button is only drawn for admins, but the client draws the button.
     if not PLS.isAdmin(player) then
@@ -240,6 +306,10 @@ function PLS_Commands.handlers.reset(player, args)
 
     PLS_State.resetBoard(board)
     PLS_Ranking.recompute(board)
+
+    -- straight to disk. the file is whole-table, so a wipe that only lived in memory leaves a
+    -- stale backup that the next /pls restore would put right back.
+    if PLS_Backup.enabled() then PLS_Backup.save() end
 
     PLS_Net.toClient(player, "toast", { kind = "reset", board = board })
 end

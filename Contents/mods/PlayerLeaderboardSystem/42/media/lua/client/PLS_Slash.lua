@@ -21,6 +21,8 @@ local USAGE = {
     "/pls dump          - is the table there, and how much of it",
     "/pls dump <name>   - one player's scores and their run right now",
     "/pls me            - your own row",
+    "/pls backup        - write the score backup file now",
+    "/pls restore       - load the backup file over the live scores",
 }
 
 -- everything after the prefix, split on whitespace.
@@ -51,6 +53,16 @@ function PLS_Slash.run(text)
 
     if verb == "dump" then
         PLS_Net.toServer("dump", { who = words[3] })
+        return
+    end
+
+    if verb == "backup" then
+        PLS_Net.toServer("backup", {})
+        return
+    end
+
+    if verb == "restore" then
+        PLS_Net.toServer("restore", {})
         return
     end
 

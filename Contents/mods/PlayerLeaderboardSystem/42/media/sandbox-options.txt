@@ -64,6 +64,12 @@ option PlayerLeaderboardSystem.MinScoreToRank
     page = PlayerLeaderboardSystem, translation = PLS_MinScoreToRank,
 }
 
+option PlayerLeaderboardSystem.BackupEnabled
+{
+    type = boolean, default = false,
+    page = PlayerLeaderboardSystem, translation = PLS_BackupEnabled,
+}
+
 option PlayerLeaderboardSystem.IgnoreDebugKills
 {
     type = boolean, default = false,
