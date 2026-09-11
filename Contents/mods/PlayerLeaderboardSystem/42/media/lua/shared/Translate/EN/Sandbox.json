@@ -16,6 +16,9 @@
   "Sandbox_PLS_AnnounceFirstPlace": "Announce First Place",
   "Sandbox_PLS_AnnounceFirstPlace_tooltip": "Tells the whole server in chat when a board's first place changes hands.",
 
+  "Sandbox_PLS_PvpPairCooldownMinutes": "Player Kill Pair Cooldown",
+  "Sandbox_PLS_PvpPairCooldownMinutes_tooltip": "Real minutes before killing the same player again counts. Stops two accounts trading kills to climb the Player Kills boards. (0-120)",
+
   "Sandbox_PLS_AnnounceCooldownMinutes": "Announce Cooldown",
   "Sandbox_PLS_AnnounceCooldownMinutes_tooltip": "Real minutes to wait between announcements on the same board, so two players trading the lead cannot flood chat. (0-120)",
 

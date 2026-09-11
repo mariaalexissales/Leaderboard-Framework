@@ -28,6 +28,12 @@ option PlayerLeaderboardSystem.TrackPlayerKillsPerLife
     page = PlayerLeaderboardSystem, translation = PLS_TrackPlayerKillsPerLife,
 }
 
+option PlayerLeaderboardSystem.PvpPairCooldownMinutes
+{
+    type = integer, min = 0, max = 120, default = 10,
+    page = PlayerLeaderboardSystem, translation = PLS_PvpPairCooldownMinutes,
+}
+
 option PlayerLeaderboardSystem.AnnounceFirstPlace
 {
     type = boolean, default = true,

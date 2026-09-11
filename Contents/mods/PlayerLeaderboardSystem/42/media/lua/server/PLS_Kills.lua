@@ -16,6 +16,12 @@ PLS_Kills = PLS_Kills or {}
 -- or an edited counter.
 local MAX_PER_FLUSH = 40
 
+-- the clamp above is per packet, and a client picks how many packets it sends. the client
+-- polls every 2s, so anything much faster is not the shipped client; the minute budget caps
+-- what a steady stream just under the floor could still add.
+local REPORT_FLOOR_MS = 1500
+local MAX_PER_MINUTE = 150
+
 -- username -> whether that client claimed debug mode at its last hello. runtime only, like the
 -- hit ledger below: a fact about a connection, not a score.
 local debugMode = {}
@@ -58,6 +64,16 @@ function PLS_Kills.forgetOffline(online)
 
     for username in pairs(PLS_Kills.lastUpset) do
         if not online[username] then PLS_Kills.lastUpset[username] = nil end
+    end
+
+    for username in pairs(PLS_Kills.reports) do
+        if not online[username] then PLS_Kills.reports[username] = nil end
+    end
+
+    -- a pair goes when either half does. rejoining to dodge the cooldown costs a reconnect per
+    -- kill, which is the kind of farming slow enough not to matter.
+    for key, pair in pairs(PLS_Kills.lastPair) do
+        if not online[pair.killer] or not online[pair.victim] then PLS_Kills.lastPair[key] = nil end
     end
 end
 
@@ -142,6 +158,10 @@ end
 
 PLS.guard("zombie kill credit", Events.OnZombieDead, PLS_onZombieDead)
 
+-- username -> { at = last packet, since = minute window start, n = kills in window }. runtime
+-- only, and on the table so the sweep above can reach it.
+PLS_Kills.reports = PLS_Kills.reports or {}
+
 -- fallback, off unless PLS.Config.clientKillReporting. some dedicated servers hand back a nil
 -- attacker on every kill, leaving the board permanently empty; a client diffing its own
 -- vanilla counter at least fills it. only the count is taken, and it is clamped.
@@ -156,11 +176,36 @@ function PLS_Kills.onReported(player, args)
     local username = PLS.nameOf(player)
     if not username then return end
 
+    local now = getTimestampMs()
+    local rec = PLS_Kills.reports[username]
+    if not rec then
+        rec = { at = 0, since = now, n = 0 }
+        PLS_Kills.reports[username] = rec
+    end
+
+    -- dropped rather than banked for later: the shipped client never sends this fast, so there
+    -- is no honest count being lost.
+    if now - rec.at < REPORT_FLOOR_MS then
+        PLS.trace("dropped a kill report from " .. username .. ": too soon after the last")
+        return
+    end
+    rec.at = now
+
     if count > MAX_PER_FLUSH then
         PLS.warn(username .. " reported " .. count
             .. " zombie kills in one flush, clamped to " .. MAX_PER_FLUSH)
         count = MAX_PER_FLUSH
     end
+
+    if now - rec.since >= 60000 then rec.since, rec.n = now, 0 end
+
+    local room = MAX_PER_MINUTE - rec.n
+    if count > room then
+        if room <= 0 then return end
+        PLS.warn(username .. " passed " .. MAX_PER_MINUTE .. " reported zombie kills in a minute")
+        count = room
+    end
+    rec.n = rec.n + count
 
     PLS_Kills.creditZombie(username, count)
 end
@@ -173,12 +218,21 @@ end
 -- twice instead and credits only where the two agree: the attacker's client reports "i hit
 -- this player" into a short-lived ledger, the victim's reports "i died, and this is who".
 --
--- the credit comes from the ledger, not the victim's claim. so a victim cannot hand first
--- place to a friend who never touched them, and an attacker cannot credit themselves without
--- a real hit landing on someone who really died.
+-- the credit comes from the ledger, not the victim's claim, so a victim cannot hand first
+-- place to a friend who never touched them. both halves are still a client's word: the hit is
+-- only held to the victim being online and in weapon range, and the death to nothing. what
+-- that leaves is two accounts agreeing to trade kills, which the pair cooldown slows to one
+-- per pair per window.
 
 local HIT_WINDOW_MS = 30000
 local DEATH_COOLDOWN_MS = 3000
+
+-- tiles. sized for a rifle, not a bat: a scope outranges any melee check worth writing, and
+-- the point is the cheater across the map, not the one across the street.
+local HIT_RANGE = 60
+
+-- "killer\0victim" -> { killer, victim, at }. runtime only.
+PLS_Kills.lastPair = PLS_Kills.lastPair or {}
 
 -- runtime only: a thirty second ledger and a rate limit have no business in the world save.
 local hits = {}
@@ -208,6 +262,17 @@ function PLS_Kills.onHit(player, args)
 
     local victim = args.victim
     if type(victim) ~= "string" or victim == "" or victim == attacker then return end
+
+    -- without this a client can put itself in every ledger on the server, and the fallback in
+    -- onDeath hands it whoever dies next to anything. singleplayer has nobody to look up.
+    if isServer() then
+        local target = getPlayerFromUsername(victim)
+        if not target then return end
+        if player:DistTo(target) > HIT_RANGE then
+            PLS.trace("dropped a hit by " .. attacker .. " on " .. victim .. ": out of range")
+            return
+        end
+    end
 
     local now = getTimestampMs()
     PLS_prune(now)
@@ -406,6 +471,16 @@ function PLS_Kills.onDeath(player, args)
     end
 
     if not killer or killer == victim then return end
+
+    -- after the ledger is spent, so a pair on cooldown cannot keep the hit for a later death.
+    local pairCooldown = (tonumber(PLS.sandbox("PvpPairCooldownMinutes", 10)) or 10) * 60000
+    local pairKey = killer .. "\0" .. victim
+    local pair = PLS_Kills.lastPair[pairKey]
+    if pair and now - pair.at < pairCooldown then
+        PLS.trace("dropped a kill of " .. victim .. " by " .. killer .. ": pair cooldown")
+        return
+    end
+    PLS_Kills.lastPair[pairKey] = { killer = killer, victim = victim, at = now }
 
     PLS_Kills.credit(killer, "pvp", 1)
     PLS_announceSlain(victim, killer, topped, toppedScore, now)
