@@ -95,9 +95,15 @@ local HELLO_RETRY_MS = 3000
 local HELLO_ATTEMPTS = 10
 
 -- opening the panel is a reason to ask again, but the keybind opens it on every peek and the
--- server floors hello at a second, so the ask is paced here rather than sent to be dropped.
--- above the server's floor on purpose: an ask that gets through beats one that is on time.
+-- server floors hello, so the ask is paced here rather than sent to be dropped. above the
+-- server's floor on purpose: an ask that gets through beats one that is on time.
 local OPEN_REQUEST_MS = 2000
+
+-- both waits stretch to the server's cooldown when an admin sets it longer; a retry landing
+-- inside it gets no answer and burns an attempt for nothing.
+local function PLS_atLeastCooldown(ms)
+    return math.max(ms, PLS.refreshCooldownMs())
+end
 
 local helloAt = 0
 local helloTries = 0
@@ -126,7 +132,7 @@ end
 -- try, and the rearm above retries it if the server drops it.
 function PLS_ClientState.requestOnOpen()
     local now = getTimestampMs()
-    if now - openAt < OPEN_REQUEST_MS then return end
+    if now - openAt < PLS_atLeastCooldown(OPEN_REQUEST_MS) then return end
     openAt = now
 
     PLS_ClientState.rearm()
@@ -138,7 +144,7 @@ local function PLS_helloTick()
     -- or pressing refresh is the way back.
     if helloTries >= HELLO_ATTEMPTS then return end
     -- cheap clock compares first, so isReady's sort runs once a retry window, not once a tick.
-    if getTimestampMs() - helloAt < HELLO_RETRY_MS then return end
+    if getTimestampMs() - helloAt < PLS_atLeastCooldown(HELLO_RETRY_MS) then return end
     if PLS_ClientState.isReady() then return end
 
     PLS_ClientState.requestBoards()

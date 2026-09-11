@@ -199,7 +199,12 @@ function PLS_Panel:onScope(button)
     self:refresh()
 end
 
+-- greyed out for the server's cooldown, so a press it would swallow is not offered. cosmetic:
+-- the server holds the line either way.
 function PLS_Panel:onRefresh()
+    self.refreshUntil = getTimestampMs() + PLS.refreshCooldownMs()
+    self.refreshBtn:setEnable(false)
+
     PLS_ClientState.rearm()
     PLS_ClientState.requestBoards()
 end
@@ -328,6 +333,11 @@ end
 -- live regardless.
 function PLS_Panel:update()
     ISCollapsableWindow.update(self)
+
+    if self.refreshUntil and getTimestampMs() >= self.refreshUntil then
+        self.refreshUntil = nil
+        self.refreshBtn:setEnable(true)
+    end
 
     if self.revision == PLS_ClientState.revision then return end
 

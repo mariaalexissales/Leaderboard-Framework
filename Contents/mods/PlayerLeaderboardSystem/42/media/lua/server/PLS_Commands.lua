@@ -16,8 +16,8 @@ PLS_Commands = PLS_Commands or {}
 
 PLS_Commands.handlers = {}
 
--- hello rebuilds every board, and it is on a button now, so it is worth a floor.
-local HELLO_COOLDOWN_MS = 1000
+-- hello resends every board, and it is on a button, so it is worth a floor. the length is
+-- PLS.refreshCooldownMs, read per packet so a sandbox change needs no restart.
 
 -- b42 has no server-side disconnect event, so lastHello and the debug table are swept against
 -- the online list instead. hello is where new names appear, so it is where the sweep belongs,
@@ -87,7 +87,7 @@ function PLS_Commands.handlers.hello(player, args)
     -- the player pressed refresh on the way in.
     PLS_checkLife(player, name)
 
-    if now - (lastHello[name] or 0) < HELLO_COOLDOWN_MS then return end
+    if now - (lastHello[name] or 0) < PLS.refreshCooldownMs() then return end
     lastHello[name] = now
 
     PLS_Ranking.sendAll(player)

@@ -109,6 +109,15 @@ function PLS.sandbox(name, fallback)
     return value
 end
 
+-- how often one player's refresh is answered. read by both ends: the server enforces it, the
+-- client paces its asks to match so they are not sent just to be dropped. floored at a second
+-- whatever the sandbox says, since every answer is a packet per board.
+function PLS.refreshCooldownMs()
+    local seconds = tonumber(PLS.sandbox("RefreshCooldownSeconds", 1)) or 1
+    if seconds < 1 then seconds = 1 end
+    return seconds * 1000
+end
+
 -- wall clock, in epoch milliseconds. the in-session cooldowns use getTimestampMs, but a stamp
 -- written into the backup by one process is read by another, and only a real calendar time
 -- means the same thing in both. falls back rather than failing.

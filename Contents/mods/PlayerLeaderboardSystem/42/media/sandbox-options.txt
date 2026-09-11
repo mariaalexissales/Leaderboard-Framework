@@ -58,6 +58,12 @@ option PlayerLeaderboardSystem.AnnounceUpsetCooldownMinutes
     page = PlayerLeaderboardSystem, translation = PLS_AnnounceUpsetCooldownMinutes,
 }
 
+option PlayerLeaderboardSystem.RefreshCooldownSeconds
+{
+    type = integer, min = 1, max = 60, default = 1,
+    page = PlayerLeaderboardSystem, translation = PLS_RefreshCooldownSeconds,
+}
+
 option PlayerLeaderboardSystem.BoardSize
 {
     type = integer, min = 3, max = 50, default = 10,
