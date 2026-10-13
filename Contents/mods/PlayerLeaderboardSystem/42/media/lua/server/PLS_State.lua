@@ -21,6 +21,10 @@ PLS_State.dirty = PLS_State.dirty or {}
 -- tell whether it has been overtaken. runtime only: a restart rebuilds every view.
 PLS_State.version = PLS_State.version or {}
 
+-- every score or run that has moved this session, whichever board it was on. PLS_Backup holds
+-- this against what it was at the last write, so an idle server rewrites nothing. runtime only.
+PLS_State.changes = PLS_State.changes or 0
+
 -- global mod data, never player:getModData(): a client's own mod data is its copy and is never
 -- pushed up, so it cannot be trusted with a score.
 function PLS_State.ensure()
@@ -70,6 +74,7 @@ function PLS_State.markDirty(board)
 
     PLS_State.dirty[board] = true
     PLS_State.version[board] = (PLS_State.version[board] or 0) + 1
+    PLS_State.changes = PLS_State.changes + 1
 end
 
 function PLS_State.add(username, board, amount)
@@ -134,6 +139,8 @@ function PLS_State.lifeAdd(username, kind, amount)
     if total < 0 then total = 0 end
 
     run[kind] = total
+    PLS_State.changes = PLS_State.changes + 1
+
     return total
 end
 
@@ -150,6 +157,7 @@ function PLS_State.lifeClear(username)
     if not run then return end
 
     data.lives[username] = { h = run.h }
+    PLS_State.changes = PLS_State.changes + 1
 end
 
 -- hours survived when last seen. a lower one next time means a different character, which is
