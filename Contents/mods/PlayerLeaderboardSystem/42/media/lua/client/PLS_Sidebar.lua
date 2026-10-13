@@ -33,23 +33,20 @@ local function PLS_isCurrentPanel(panel)
     return true
 end
 
--- every button the sidebar can build. half are conditional, and adminBtn and warManagerBtn
--- are built for every mp player but hidden for most.
+-- every button the sidebar can build, for the fallback below. half are conditional, and
+-- adminBtn and warManagerBtn are built for every mp player but hidden for most.
 local BUTTONS = {
     "invBtn", "healthBtn", "craftingBtn", "buildBtn", "movableBtn", "searchBtn",
     "zoneBtn", "mapBtn", "debugBtn", "arfBtn", "safetyBtn", "clientBtn",
     "adminBtn", "warManagerBtn",
 }
 
--- vanilla's UI_BORDER_SPACING + 5 rhythm, local to ISEquippedItem like TEXTURE_WIDTH, so the
--- number is written out again here.
-local COLUMN_GAP = 15
-
--- the lowest button actually on screen, worked out every frame: ISEquippedItem toggles
--- adminBtn from hasAdminTool() in prerender, shows warManagerBtn only during a war, and moves
--- it up when adminBtn is hidden. visibility is the test, not existence, or we would hang off
--- a button nobody can see.
+-- mapBtn only exists when ISWorldMap.IsAllowed(), so a server with the map switched off flies
+-- out of the lowest button actually on screen instead. visibility is the test, not existence,
+-- or we would hang off a button nobody can see.
 local function PLS_anchor(panel)
+    if panel.mapBtn then return panel.mapBtn end
+
     local lowest, bottom = nil, -1
     for _, name in ipairs(BUTTONS) do
         local button = panel[name]
@@ -59,6 +56,19 @@ local function PLS_anchor(panel)
     end
 
     return lowest
+end
+
+-- vanilla's map flyout is two cells wide, so start after it. measured, not assumed: it is
+-- only built when ISMiniMap.IsAllowed().
+local function PLS_cellOffset(panel, anchor, textureWidth)
+    local cells = 1
+
+    if anchor == panel.mapBtn and panel.mapPopup and panel.mapPopup.getWidth then
+        local width = panel.mapPopup:getWidth() or 0
+        cells = math.max(cells, math.ceil(width / textureWidth))
+    end
+
+    return cells
 end
 
 PLS_Popup = ISPanel:derive("PLS_Popup")
@@ -110,6 +120,13 @@ end
 function PLS_Popup:render()
     local open = PLS.isWindowOpen(self.playerNum)
     local texture = open and (self.iconOn or self.iconOff) or self.iconOff
+    local over = self:isMouseOver()
+
+    -- the backing and hover wash vanilla's flyouts draw, so the cell reads as one of them.
+    self:drawRect(0, 0, self.width, self.height, 0.80, 0, 0, 0)
+    if over then
+        self:drawRect(0, 0, self.width, self.height, 0.15, 1, 1, 1)
+    end
 
     -- a missing texture should cost us the icon, not the whole sidebar render pass.
     if texture then
@@ -117,7 +134,7 @@ function PLS_Popup:render()
         return
     end
 
-    self:drawPodium(open or self:isMouseOver())
+    self:drawPodium(open or over)
 end
 
 function PLS_Popup:onMouseMove(dx, dy)
@@ -176,29 +193,57 @@ local function PLS_ensurePopup(panel)
         panel.PLS_popup.owner = panel
         panel.PLS_popup:addToUIManager()
         panel.PLS_popup:setVisible(false)
+
+        -- vanilla's flyout is always on top and its black box runs wider than its two cells
+        -- at the smallest sidebar size. ours is added after it, so this keeps us above the box.
+        panel.PLS_popup:setAlwaysOnTop(true)
     end
 
-    panel.PLS_popup:setX(panel:getAbsoluteX() + anchor:getX())
-    panel.PLS_popup:setY(panel:getAbsoluteY() + anchor:getBottom() + COLUMN_GAP)
+    local offset = PLS_cellOffset(panel, anchor, textureWidth)
+    panel.PLS_popup:setX(panel:getAbsoluteX() + anchor:getX() + offset * textureWidth)
+    panel.PLS_popup:setY(panel:getAbsoluteY() + anchor:getY())
     panel.PLS_popup:setWidth(textureWidth)
     panel.PLS_popup:setHeight(textureHeight)
     panel.PLS_popup:setTextures(textureWidth)
+
+    -- kept so visibility reads the button the cell was placed against, even if the fallback
+    -- anchor moves between frames.
+    panel.PLS_popup.anchor = anchor
 end
 
--- the cell is always up, like the rest of the column. tutorial is the one place the sidebar
--- is not the player's to poke at.
+-- up only while the cursor is on the way to it, like vanilla's own flyouts. a hidden cell
+-- takes no clicks, so nothing of ours sits on the column.
 local function PLS_updateVisibility(panel)
     if not panel or not panel.PLS_popup then return end
     if not PLS_isCurrentPanel(panel) then return end
 
-    local show = "Tutorial" ~= getCore():getGameMode()
+    local popup = panel.PLS_popup
+    local anchor = popup.anchor
 
-    panel.PLS_popup:setVisible(show)
+    -- the world map check is vanilla's: the button still reads as hovered for a frame after
+    -- the click that opened the map.
+    local show = anchor ~= nil and anchor:isMouseOver()
+        and not (ISWorldMap_instance and ISWorldMap_instance:isVisible())
 
-    if show then
-        panel.PLS_popup:bringToTop()
-    else
-        panel.PLS_popup:hideTooltip()
+    -- travelling right from the map button crosses vanilla's View Map / Toggle Minimap
+    -- flyout, and without this the cursor loses us halfway.
+    if not show and panel.mapPopup then
+        show = panel.mapPopup:isMouseOver()
+    end
+
+    -- a hidden element never reads as hovered, so this holds the cell open but cannot open it.
+    if not show then
+        show = popup:isMouseOver()
+    end
+
+    if "Tutorial" == getCore():getGameMode() then
+        show = false
+    end
+
+    popup:setVisible(show)
+
+    if not show then
+        popup:hideTooltip()
     end
 end
 
