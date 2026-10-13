@@ -71,6 +71,36 @@ local function PLS_cellOffset(panel, anchor, textureWidth)
     return cells
 end
 
+-- the other cells that fly out of the map button: Quest System Framework's, then zBay's
+-- after it. both go where ours would, on the end of vanilla's flyout, and neither knows
+-- about us, so ours goes after the pair of them whichever loaded first.
+local NEIGHBOURS = { "QSF_popup", "zBay_popup" }
+
+-- how far along the row they push us. off the map button only: the fallback anchor has no
+-- row of theirs to share.
+local function PLS_neighbourWidth(panel, anchor)
+    if anchor ~= panel.mapBtn then return 0 end
+
+    local width = 0
+    for _, name in ipairs(NEIGHBOURS) do
+        local cell = panel[name]
+        if cell and cell.getWidth then width = width + (cell:getWidth() or 0) end
+    end
+
+    return width
+end
+
+local function PLS_overNeighbour(panel, anchor)
+    if anchor ~= panel.mapBtn then return false end
+
+    for _, name in ipairs(NEIGHBOURS) do
+        local cell = panel[name]
+        if cell and cell.isMouseOver and cell:isMouseOver() then return true end
+    end
+
+    return false
+end
+
 PLS_Popup = ISPanel:derive("PLS_Popup")
 
 function PLS_Popup:new(x, y, width, height, chr)
@@ -200,7 +230,8 @@ local function PLS_ensurePopup(panel)
     end
 
     local offset = PLS_cellOffset(panel, anchor, textureWidth)
-    panel.PLS_popup:setX(panel:getAbsoluteX() + anchor:getX() + offset * textureWidth)
+    panel.PLS_popup:setX(panel:getAbsoluteX() + anchor:getX() + offset * textureWidth
+        + PLS_neighbourWidth(panel, anchor))
     panel.PLS_popup:setY(panel:getAbsoluteY() + anchor:getY())
     panel.PLS_popup:setWidth(textureWidth)
     panel.PLS_popup:setHeight(textureHeight)
@@ -229,6 +260,11 @@ local function PLS_updateVisibility(panel)
     -- flyout, and without this the cursor loses us halfway.
     if not show and panel.mapPopup then
         show = panel.mapPopup:isMouseOver()
+    end
+
+    -- and then the quest cell and zBay's, where they are installed: the way across to ours.
+    if not show then
+        show = PLS_overNeighbour(panel, anchor)
     end
 
     -- a hidden element never reads as hovered, so this holds the cell open but cannot open it.
