@@ -247,6 +247,21 @@ local function PLS_prune(now)
     end
 end
 
+-- getPlayerFromUsername asks the client's own player list, which is empty in a server
+-- process, so it answered nil for everybody and every hit was dropped on the spot. the
+-- server's list is walked instead, by the same name the scores are keyed on.
+local function PLS_onlinePlayer(username)
+    local players = getOnlinePlayers()
+    if not players then return nil end
+
+    for i = 0, players:size() - 1 do
+        local player = players:get(i)
+        if player and PLS.nameOf(player) == username then return player end
+    end
+
+    return nil
+end
+
 -- player is the attacker, from the engine. args.victim is the only client-chosen part, and the
 -- worst it does is put a name in a ledger only spent if that name actually dies.
 function PLS_Kills.onHit(player, args)
@@ -266,7 +281,7 @@ function PLS_Kills.onHit(player, args)
     -- without this a client can put itself in every ledger on the server, and the fallback in
     -- onDeath hands it whoever dies next to anything. singleplayer has nobody to look up.
     if isServer() then
-        local target = getPlayerFromUsername(victim)
+        local target = PLS_onlinePlayer(victim)
         if not target then return end
         if player:DistTo(target) > HIT_RANGE then
             PLS.trace("dropped a hit by " .. attacker .. " on " .. victim .. ": out of range")
