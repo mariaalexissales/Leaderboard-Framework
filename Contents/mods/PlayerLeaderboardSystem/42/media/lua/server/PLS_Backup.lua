@@ -27,6 +27,10 @@ local FILE_V = 1
 -- to read it back before overwriting.
 local lastText = nil
 
+-- when the file was last written, and what PLS_State.changes was then.
+local savedAt = nil
+local savedChanges = nil
+
 -- off unless a server owner asks for it. read per call rather than cached, so the option can
 -- be flipped mid-session. the two admin commands deliberately do not consult this: somebody
 -- typing /pls backup wants the file written.
@@ -52,8 +56,18 @@ function PLS_Backup.world()
     return "world"
 end
 
+local function PLS_stem()
+    return "pls_scores_" .. string.gsub(PLS_Backup.world(), "[^%w%-_]", "_")
+end
+
 function PLS_Backup.path()
-    return "pls_scores_" .. string.gsub(PLS_Backup.world(), "[^%w%-_]", "_") .. ".json"
+    return PLS_stem() .. ".json"
+end
+
+-- the copy before this one. a second .json and not a .bak: the file api only opens ini, cfg,
+-- txt, log and json, and asked for anything else it hands back nothing and logs nothing.
+function PLS_Backup.sparePath()
+    return PLS_stem() .. "_prev.json"
 end
 
 -- where that path actually resolves to, for a human being told about it. never passed to the
@@ -123,10 +137,10 @@ function PLS_Backup.save()
         return false
     end
 
-    -- the previous payload goes to .bak before the main file is touched. a process killed
-    -- between these two writes -- the exact failure this file exists for -- leaves .bak whole
-    -- and only the main file torn, which is what read() below is prepared for.
-    if lastText then PLS_write(path .. ".bak", lastText) end
+    -- the previous payload goes to the spare before the main file is touched. a process
+    -- killed between these two writes -- the exact failure this file exists for -- leaves the
+    -- spare whole and only the main file torn, which is what read() below is prepared for.
+    if lastText then PLS_write(PLS_Backup.sparePath(), lastText) end
 
     if not PLS_write(path, text) then
         PLS.warn("could not write the score backup to " .. path)
@@ -134,8 +148,29 @@ function PLS_Backup.save()
     end
 
     lastText = text
+    savedAt = getTimestampMs()
+    savedChanges = PLS_State.changes
 
     return true, path
+end
+
+-- a dedicated server has no save event to hang this on: OnSave is fired by the client's own
+-- save and by nothing in the server's, which writes the world without a word to lua. left to
+-- OnSave alone the file was written at boot and never again. so the clock keeps it current,
+-- and only when a score has moved since the last write.
+local BACKUP_MS = 5 * 60000
+
+function PLS_Backup.tick()
+    if not PLS_Backup.enabled() then return end
+    if savedChanges == PLS_State.changes then return end
+
+    local now = getTimestampMs()
+    if savedAt and now - savedAt < BACKUP_MS then return end
+
+    -- stamped before the write, so a file that cannot be written is tried again in five
+    -- minutes and not on every tick.
+    savedAt = now
+    PLS_Backup.save()
 end
 
 -- ----------------------------------------------------------------------------
@@ -148,8 +183,8 @@ local function PLS_count(players)
     return n
 end
 
--- the file, or the .bak if the file is gone or unreadable. returns the parsed table, which of
--- the two it came from, and the text it was parsed from.
+-- the file, or the spare if the file is gone or unreadable. returns the parsed table, which
+-- of the two it came from, and the text it was parsed from.
 function PLS_Backup.read()
     local path = PLS_Backup.path()
 
@@ -162,11 +197,12 @@ function PLS_Backup.read()
             .. tostring(err) .. "), falling back to the previous one")
     end
 
-    local backup = PLS_read(path .. ".bak")
+    local spare = PLS_Backup.sparePath()
+    local backup = PLS_read(spare)
     if not backup then return nil end
 
     local parsed, err = PLS_Json.decode(backup)
-    if parsed then return parsed, path .. ".bak", backup end
+    if parsed then return parsed, spare, backup end
 
     PLS.warn("the previous score backup could not be read either: " .. tostring(err))
     return nil
@@ -222,11 +258,14 @@ Events.OnInitGlobalModData.Add(function()
     PLS_Backup.save()
 end)
 
--- this is the reboot hook. OnSave is the only shutdown-adjacent event the game hands a mod,
--- and it also fires on the periodic world save, so the file keeps pace with the save it is
--- backing up without needing a clock of its own.
+-- singleplayer: OnSave fires on quit and on the periodic world save, so there the file keeps
+-- pace with the save it is backing up.
 if Events.OnSave then
     PLS.guard("score backup on save", Events.OnSave, function()
         if PLS_Backup.enabled() then PLS_Backup.save() end
     end)
 end
+
+-- everywhere else, the clock. EveryOneMinute is only what wakes it: the five minutes are
+-- counted on the real clock, as PLS_Ranking's pump counts its three seconds.
+PLS.guard("score backup clock", Events.EveryOneMinute, PLS_Backup.tick)
