@@ -49,11 +49,22 @@ local function PLS_sweep(now)
     PLS_Kills.forgetOffline(online)
 end
 
--- a best-life score inflates only if a client never sends its death packet, keeping one run
--- alive forever. cheap cover: a dead player lands back at the main menu, so a rejoin follows,
--- and hours survived going backwards means a character this account has not been seen on.
-local function PLS_checkLife(player, name)
+-- backup for the death event in PLS_Kills, which should already have ended the run. a run
+-- that outlived its character inflates the best-life board on the next character's first kill.
+local function PLS_checkLife(player, name, args)
     if not PLS_Boards.anyLife() then return end
+
+    -- a run only counts this character's kills, so it can never be higher than the character's
+    -- own count. if it is, the character it belonged to is dead. the count is the client's word,
+    -- but the most a client can do with it is end its own run, like a made-up death packet.
+    local kills = args and tonumber(args.kills)
+    if kills and PLS_State.lifeGet(name, "zombie") > kills then
+        PLS.trace(name .. " said hello with fewer kills than their run, so the old life is over")
+        PLS_Kills.endLife(name)
+    end
+
+    -- hours survived going backwards is a character this account has not been seen on. this
+    -- one still covers a run of player kills alone.
 
     -- through pcall: not every build answers this, and a handshake is a bad place to take
     -- the mod down over a stat nobody is ranked on.
@@ -85,7 +96,7 @@ function PLS_Commands.handlers.hello(player, args)
 
     -- above the floor too: a rejoin is what this exists for, and must not be missed because
     -- the player pressed refresh on the way in.
-    PLS_checkLife(player, name)
+    PLS_checkLife(player, name, args)
 
     if now - (lastHello[name] or 0) < PLS.refreshCooldownMs() then return end
     lastHello[name] = now

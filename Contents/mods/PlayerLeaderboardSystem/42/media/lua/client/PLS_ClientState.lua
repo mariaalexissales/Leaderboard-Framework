@@ -116,7 +116,17 @@ function PLS_ClientState.requestBoards()
     -- the server cannot read a remote client's launch flags, so the client says. it gates
     -- scoring and nothing else; PLS_Kills.setDebug records how far it is trusted. rides on hello
     -- because OnZombieDead has no packet of its own.
-    PLS_Net.toServer("hello", { debug = getCore():getDebug() == true })
+    --
+    -- kills is this character's own count, so the server can tell a run left over from a dead
+    -- one. nil when there is no player yet, which the server reads as "no answer".
+    local kills = nil
+    local player = getPlayer()
+    if player then
+        local ok, n = pcall(function() return player:getZombieKills() end)
+        if ok and type(n) == "number" then kills = n end
+    end
+
+    PLS_Net.toServer("hello", { debug = getCore():getDebug() == true, kills = kills })
 end
 
 -- puts the retry back on the clock. seen goes with it: a refresh the server swallows on its

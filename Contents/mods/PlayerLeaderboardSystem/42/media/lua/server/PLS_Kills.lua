@@ -70,6 +70,10 @@ function PLS_Kills.forgetOffline(online)
         if not online[username] then PLS_Kills.reports[username] = nil end
     end
 
+    for username in pairs(PLS_Kills.endedRuns) do
+        if not online[username] then PLS_Kills.endedRuns[username] = nil end
+    end
+
     -- a pair goes when either half does. rejoining to dodge the cooldown costs a reconnect per
     -- kill, which is the kind of farming slow enough not to matter.
     for key, pair in pairs(PLS_Kills.lastPair) do
@@ -226,6 +230,9 @@ end
 
 local HIT_WINDOW_MS = 30000
 local DEATH_COOLDOWN_MS = 3000
+
+-- how long the runs a server-side death wiped wait for the client's packet to announce them.
+local ENDED_RUN_MS = 30000
 
 -- tiles. sized for a rifle, not a bat: a scope outranges any melee check worth writing, and
 -- the point is the cheater across the map, not the one across the street.
@@ -418,6 +425,34 @@ function PLS_Kills.endLife(username)
     PLS.trace("ended the life of " .. username)
 end
 
+-- the runs a server-side death wiped, kept so the client's death packet can still announce
+-- them. username -> { runs, at }. runtime only.
+PLS_Kills.endedRuns = PLS_Kills.endedRuns or {}
+
+-- the client's death packet is not enough on its own: a dead client's command can arrive after
+-- the server has emptied its slot, and receiveClientCommand drops it. the run then carried on
+-- into the next character. OnCharacterDeath fires in the server's own DoDeath, so the run ends
+-- here whatever the client manages to send. server only: in singleplayer the packet is a direct
+-- call and cannot be lost.
+local function PLS_onCharacterDeath(character)
+    if not character or not instanceof(character, "IsoPlayer") then return end
+    if not PLS_Boards.anyLife() then return end
+
+    local victim = PLS.nameOf(character)
+    if not victim then return end
+
+    PLS_Kills.endedRuns[victim] = {
+        runs = PLS_runsOf(victim, PLS_lifeBoards()),
+        at = getTimestampMs(),
+    }
+
+    PLS_Kills.endLife(victim)
+end
+
+if isServer() then
+    PLS.guard("server death", Events.OnCharacterDeath, PLS_onCharacterDeath)
+end
+
 -- player is the victim, from the engine, never read out of args.
 --
 -- both halves of a death come through here rather than two handlers, because the cooldown has
@@ -436,8 +471,17 @@ function PLS_Kills.onDeath(player, args)
     local boards = PLS_lifeBoards()
 
     -- both read before anything below changes them: endLife wipes the runs, and the credit can
-    -- move the top of a board.
-    local runs = PLS_runsOf(victim, boards)
+    -- move the top of a board. on a server the death event has usually wiped them already, and
+    -- left what they were behind.
+    local ended = PLS_Kills.endedRuns[victim]
+    PLS_Kills.endedRuns[victim] = nil
+
+    local runs
+    if ended and now - ended.at < ENDED_RUN_MS then
+        runs = ended.runs
+    else
+        runs = PLS_runsOf(victim, boards)
+    end
 
     -- only the slain line reads this, and that line is unreachable with player kills off, so
     -- asking would sort a board for an answer nobody looks at. still asked here rather than

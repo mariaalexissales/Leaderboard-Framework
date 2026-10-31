@@ -39,7 +39,8 @@ end
 
 -- reported for two unrelated reasons, so it asks about both. the per-life boards matter here:
 -- pvp is off in shipped settings, and gating on it alone left the running counts with nothing
--- to reset them.
+-- to reset them. on a server the run is also ended by the server's own death event, since this
+-- packet can be dropped once the player is dead; what it still adds there is the killer and cause.
 local function PLS_onPlayerDeath(player)
     if not PLS_Boards.tracked("pvp") and not PLS_Boards.anyLife() then return end
     if not player or not player:isLocalPlayer() then return end
